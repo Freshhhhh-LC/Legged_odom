@@ -17,8 +17,6 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
         def reset(self):
             obs, infos = super().reset()
             self.obs_history[:, :, :] = obs.unsqueeze(1)
-            print("self.odom_obs_history shape:", self.odom_obs_history.shape)
-            print("obs shape:", obs.shape)
             self.odom_obs_history[:, :, 0:9] = obs[:, 0:9].unsqueeze(1)
             self.odom_obs_history[:, :, 9:46] = obs[:, 13:50].unsqueeze(1)
             _, _, yaw = get_euler_xyz(self.root_states[:, 3:7])
@@ -28,7 +26,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
                     "obs_history": self.obs_history,
                     "odom_obs_history": self.odom_obs_history,
                     "yaw_history": torch.zeros_like(self.yaw_history),
-                    "pos_history": torch.zeros_like(self.pos_history),
+                    "pos_history": torch.zeros_like(self.pos_history),                    "pos_groundtruth": self.root_states[:, 0:2],
                 }
             )
             return obs, infos
@@ -68,6 +66,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
                         ),
                         dim=-1,
                     ),
+                    "pos_groundtruth": self.root_states[:, 0:2],
                 }
             )
 

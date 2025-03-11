@@ -61,7 +61,7 @@ if __name__ == "__main__":
         odom_loss_list = list()
         for j in range(20):
             odom_pred = odom_model(buf["odom_obs_history"], buf["yaw_history"])
-            pos_inc = buf["pos_history"][..., 0, :] - buf["pos_history"][..., 1, :]
+            pos_inc = buf["pos_history"][..., -1, :] - buf["pos_history"][..., -2 , :]
             odom_loss = F.mse_loss(odom_pred, pos_inc)
             optimizer.zero_grad()
             odom_loss.backward()
