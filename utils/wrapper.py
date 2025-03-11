@@ -27,6 +27,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
                     "odom_obs_history": self.odom_obs_history,
                     "yaw_history": torch.zeros_like(self.yaw_history),
                     "pos_history": torch.zeros_like(self.pos_history),
+                    "pos_groundtruth": self.root_states[:, 0:2],
                 }
             )
             return obs, infos
@@ -66,6 +67,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
                         ),
                         dim=-1,
                     ),
+                    "pos_groundtruth": self.root_states[:, 0:2],
                 }
             )
 

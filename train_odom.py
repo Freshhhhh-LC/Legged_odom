@@ -14,7 +14,7 @@ from envs.T1_run_act_history import T1RunActHistoryEnv
 if __name__ == "__main__":
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
     os.makedirs(dir, exist_ok=True)
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 1024, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 2048, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
     odom_model = OdomEstimator(32 + 4, env.obs_stacking).to(env.device)
     optimizer = torch.optim.Adam(odom_model.parameters(), lr=3e-4)
@@ -27,10 +27,12 @@ if __name__ == "__main__":
     buf.AddBuffer("yaw_history", (env.obs_stacking,), device=env.device)
     buf.AddBuffer("pos_history", (env.obs_stacking + 1, 2), device=env.device)
 
-    # latest_model_path = 
-    # if latest_model_path:
-    #     odom_model.load_state_dict(torch.load(latest_model_path))
-    #     print(f"Loaded model from {latest_model_path}")
+    latest_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-11-20-47-27/model_300.pth"
+    if latest_model_path:
+        checkpoint = torch.load(latest_model_path)
+        odom_model.load_state_dict(checkpoint['model'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        print(f"Loaded model from {latest_model_path}")
 
     obs, infos = env.reset()
     obs_history = infos["obs_history"].to(env.device)
