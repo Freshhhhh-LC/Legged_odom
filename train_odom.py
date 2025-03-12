@@ -23,7 +23,7 @@ if __name__ == "__main__":
     recorder = SummaryWriter(dir)
     buf = Dataset(24, env.num_envs)
     buf.AddBuffer("obs_history", (env.obs_stacking, env.num_obs), device=env.device)
-    buf.AddBuffer("odom_obs_history", (env.obs_stacking, 32), device=env.device)
+    buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking, 32), device=env.device)
     buf.AddBuffer("yaw_history", (env.obs_stacking,), device=env.device)
     buf.AddBuffer("pos_history", (env.obs_stacking + 1, 2), device=env.device)
 
@@ -36,14 +36,14 @@ if __name__ == "__main__":
 
     obs, infos = env.reset()
     obs_history = infos["obs_history"].to(env.device)
-    odom_obs_history = infos["odom_obs_history"].to(env.device)
+    odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
     yaw_history = infos["yaw_history"].to(env.device)
     pos_history = infos["pos_history"].to(env.device)
 
     for i in range(60000):
         for j in range(24):
             buf.Record("obs_history", j, obs_history)
-            buf.Record("odom_obs_history", j, odom_obs_history)
+            buf.Record("odom_obs_history_wys", j, odom_obs_history_wys)
             buf.Record("yaw_history", j, yaw_history)
             buf.Record("pos_history", j, pos_history)
             obs_m = env.mirror_obs(obs)
@@ -56,13 +56,13 @@ if __name__ == "__main__":
                 act = act_mean + act_std * torch.randn_like(act_std)
             obs, rew, done, infos = env.step(act)
             obs_history = infos["obs_history"].to(env.device)
-            odom_obs_history = infos["odom_obs_history"].to(env.device)
+            odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
             yaw_history = infos["yaw_history"].to(env.device)
             pos_history = infos["pos_history"].to(env.device)
 
         odom_loss_list = list()
         for j in range(20):
-            odom_pred = odom_model(buf["odom_obs_history"], buf["yaw_history"], buf["pos_history"][..., :-1, :])
+            odom_pred = odom_model(buf["odom_obs_history_wys"], buf["yaw_history"], buf["pos_history"][..., :-1, :])
             odom_loss = F.mse_loss(odom_pred, buf["pos_history"][..., -1, :])
             optimizer.zero_grad()
             odom_loss.backward()
