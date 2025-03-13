@@ -122,7 +122,7 @@ class DenoisingRMA(RMA):
             return dist, embedding
 
 
-class OdomEstimator(torch.nn.Module):
+class OdomEstimator_wys(torch.nn.Module):
 
     def __init__(self, num_obs, num_stack):
         super().__init__()
@@ -138,6 +138,26 @@ class OdomEstimator(torch.nn.Module):
 
     def forward(self, stacked_obs, stacked_yaw, stacked_pos):
         input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1), stacked_pos), dim=-1).flatten(
+            start_dim=-2
+        )
+        return self.net(input)
+    
+class OdomEstimator_Legolas(torch.nn.Module):
+
+    def __init__(self, num_obs, num_stack):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(num_obs * num_stack, 512),
+            torch.nn.ELU(),
+            torch.nn.Linear(512, 128),
+            torch.nn.ELU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.ELU(),
+            torch.nn.Linear(64, 2),
+        )
+
+    def forward(self, stacked_obs, stacked_yaw):
+        input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1)), dim=-1).flatten(
             start_dim=-2
         )
         return self.net(input)
