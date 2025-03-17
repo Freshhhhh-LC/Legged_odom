@@ -1,5 +1,7 @@
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
+import torchvision.models as models
 
 
 class ActorCritic(torch.nn.Module):
@@ -161,3 +163,94 @@ class OdomEstimator_Legolas(torch.nn.Module):
             start_dim=-2
         )
         return self.net(input)
+    
+# class Bottlrneck(torch.nn.Module):
+#     def __init__(self,In_channel,Med_channel,Out_channel,downsample=False):
+#         super(Bottlrneck, self).__init__()
+#         self.stride = 1
+#         if downsample == True:
+#             self.stride = 2
+
+#         self.layer = torch.nn.Sequential(
+#             torch.nn.Conv1d(In_channel, Med_channel, 1, self.stride),
+#             torch.nn.BatchNorm1d(Med_channel),
+#             torch.nn.ReLU(),
+#             torch.nn.Conv1d(Med_channel, Med_channel, 3, padding=1),
+#             torch.nn.BatchNorm1d(Med_channel),
+#             torch.nn.ReLU(),
+#             torch.nn.Conv1d(Med_channel, Out_channel, 1),
+#             torch.nn.BatchNorm1d(Out_channel),
+#             torch.nn.ReLU(),
+#         )
+
+#         if In_channel != Out_channel:
+#             self.res_layer = torch.nn.Conv1d(In_channel, Out_channel,1,self.stride)
+#         else:
+#             self.res_layer = None
+
+#     def forward(self,x):
+#         if self.res_layer is not None:
+#             residual = self.res_layer(x)
+#         else:
+#             residual = x
+#         return self.layer(x)+residual
+    
+# class OdomEstimator_Legolas(torch.nn.Module):
+
+#     def __init__(self, num_obs, num_stack):
+#         super().__init__()
+#         # self.net = torch.nn.Sequential(
+#         #     torch.nn.Linear(num_obs * num_stack, 512),
+#         #     torch.nn.ELU(),
+#         #     torch.nn.Linear(512, 128),
+#         #     torch.nn.ELU(),
+#         #     torch.nn.Linear(128, 64),
+#         #     torch.nn.ELU(),
+#         #     torch.nn.Linear(64, 2),
+#         # )
+#         self.features = torch.nn.Sequential(
+#             torch.nn.Conv1d(num_obs,64,kernel_size=7,stride=2,padding=3),
+#             torch.nn.MaxPool1d(3,2,1),
+
+#             Bottlrneck(64,64,256,True),
+#             Bottlrneck(256,64,256,False),
+#             Bottlrneck(256,64,256,False),
+
+#             torch.nn.AdaptiveAvgPool1d(1)
+#         )
+#         self.classifer = torch.nn.Sequential(
+#             torch.nn.Linear(256,2)
+#         )
+
+
+#     def forward(self, stacked_obs, stacked_yaw):
+#         batch_size = stacked_obs.size(0)
+#         num_envs = stacked_obs.size(1)
+#         input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1)), dim=-1) #24,1024,50,48
+#         # input = input.flatten(start_dim=-2)
+#         input = input.view(input.size(0) * input.size(1), -1, input.size(3)).transpose(1,2) #24*1024,50,48
+#         input = self.features(input)
+#         input = input.view(input.size(0), -1)
+#         return self.classifer(input).view(batch_size,num_envs,2)
+
+
+# class OdomEstimator_Legolas(torch.nn.Module):
+
+#     def __init__(self, num_obs, num_stack):
+#         super().__init__()
+#         self.net = torch.nn.Sequential(
+#             torch.nn.Conv1d(in_channels=num_obs, out_channels=64, kernel_size=3, stride=1, padding=1),
+#             torch.nn.ELU(),
+#             torch.nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1),
+#             torch.nn.ELU(),
+#             torch.nn.AdaptiveAvgPool1d(1),
+#             torch.nn.Flatten(),
+#             torch.nn.Linear(128, 2)
+#         )
+
+#     def forward(self, stacked_obs, stacked_yaw):
+#         input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1)), dim=-1) #24,1024,50,48
+#         # input = input.flatten(start_dim=-2)
+#         input = input.view(input.size(0) * input.size(1), -1, input.size(3)).transpose(1,2) #24*1024,50,48
+
+#         return self.net(input)

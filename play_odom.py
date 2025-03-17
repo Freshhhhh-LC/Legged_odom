@@ -14,7 +14,7 @@ from envs.T1_run_act_history import T1RunActHistoryEnv
 if __name__ == "__main__":
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
     os.makedirs(dir, exist_ok=True)
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 1, "cuda:0", F, curriculum=False, change_cmd=False) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 1, "cuda:0", False, curriculum=False, change_cmd=False) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
     odom_model_wys = OdomEstimator_wys(32 + 4, env.obs_stacking).to(env.device)
@@ -45,14 +45,14 @@ if __name__ == "__main__":
     abs_yaw_history = infos["abs_yaw_history"].to(env.device)
 
 
-    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-13-11-03-38/model_wys_3700.pth"
+    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-17-21-17-24/model_wys_100.pth"
     if latest_wys_model_path:
         checkpoint = torch.load(latest_wys_model_path)
         odom_model_wys.load_state_dict(checkpoint['model'])
         optimizer_wys.load_state_dict(checkpoint['optimizer'])
         print(f"Loaded model from {latest_wys_model_path}")
     
-    latest_Legolas_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-13-11-03-38/model_Legolas_3700.pth"
+    latest_Legolas_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-17-21-17-24/model_Legolas_100.pth"
     if latest_Legolas_model_path:
         checkpoint = torch.load(latest_Legolas_model_path)
         odom_model_Legolas.load_state_dict(checkpoint['model'])
@@ -107,13 +107,14 @@ if __name__ == "__main__":
         
         odom_pred_wys_pos = torch.stack(
             (
-                torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] - torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-50][:, 0],
-                torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] + torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-50][:, 1]
+                torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] - torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 0],
+                torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] + torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 1]
             ),
             dim=-1
-        ) # x_i = d_i + x_i-50 [num_envs, 2]
+        ) # x_i = d_i + x_i-1[num_envs, 2]
 
         odom_pred_Legolas = odom_model_Legolas(odom_obs_history_Legolas, yaw_history)
+        # odom_pred_Legolas = odom_model_Legolas(odom_obs_history_Legolas.unsqueeze(0), yaw_history.unsqueeze(0)).squeeze(0)
 
         # odom_pred_pos = odom_pred[i, :, :2] + odom_pred_pos_list[-1][:, :2] # x_i = d_i + x_i-1 
         odom_pred_Legolas_pos = torch.stack(
