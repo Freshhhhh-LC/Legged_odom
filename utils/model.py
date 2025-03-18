@@ -163,6 +163,27 @@ class OdomEstimator_Legolas(torch.nn.Module):
             start_dim=-2
         )
         return self.net(input)
+
+class OdomEstimator_baseline(torch.nn.Module):
+
+    def __init__(self, num_obs, num_stack):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(num_obs * num_stack, 512),
+            torch.nn.ELU(),
+            torch.nn.Linear(512, 128),
+            torch.nn.ELU(),
+            torch.nn.Linear(128, 64),
+            torch.nn.ELU(),
+            torch.nn.Linear(64, 2),
+        )
+
+    def forward(self, stacked_obs, stacked_yaw, start_mask):
+        input = torch.cat(
+            (stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1), start_mask.unsqueeze(-1)), dim=-1
+        ).flatten(start_dim=-2)
+        return self.net(input)
+
     
 # class Bottlrneck(torch.nn.Module):
 #     def __init__(self,In_channel,Med_channel,Out_channel,downsample=False):
