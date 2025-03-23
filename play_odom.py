@@ -31,16 +31,6 @@ if __name__ == "__main__":
     model.load_state_dict(state_dict["model"])
     recorder = SummaryWriter(dir)
 
-    # buf = Dataset(24, env.num_envs)
-    # buf.AddBuffer("obs_history", (env.obs_stacking, env.num_obs), device=env.device)
-    # buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking, 32), device=env.device)
-    # buf.AddBuffer("odom_obs_history_Legolas", (env.obs_stacking, 46), device=env.device)
-    # buf.AddBuffer("odom_obs_history_baseline", (env.obs_stacking, 45), device=env.device)
-    # buf.AddBuffer("yaw_history", (env.obs_stacking,), device=env.device)
-    # buf.AddBuffer("pos_history", (env.obs_stacking + 1, 2), device=env.device)
-    # buf.AddBuffer("abs_yaw_history", (env.obs_stacking,), device=env.device)
-    # buf.AddBuffer("start_mask", (env.obs_stacking,), device=env.device)
-    # buf.AddBuffer("odom", (2,), device=env.device)
     stacked_odom_pos = torch.zeros(env.num_envs, env.obs_stacking, 2, device=env.device)
     baseline_origin_pos = torch.zeros(env.num_envs, 2, device=env.device)
     baseline_origin_yaw = torch.zeros(env.num_envs, device=env.device)
@@ -189,6 +179,7 @@ if __name__ == "__main__":
         obs_history = infos["obs_history"].to(env.device)
         odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
         odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(env.device)
+        odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(env.device)
         yaw_history = infos["yaw_history"].to(env.device) # [num_envs, obs_stacking] yaw_{i-49} ~ yaw_i
         pos_history = infos["pos_history"].to(env.device)# [num_envs, obs_stacking + 1, 2] x_{i-50}-x_{i-50} ~ x_i - x_{i-50}
         pos_groundtruth = infos["pos_groundtruth"].to(env.device) # [num_envs, 2] x_i
