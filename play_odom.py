@@ -10,10 +10,10 @@ from utils.wrapper import ObsStackingEnvWrapperForOdom
 from utils.model import DenoisingRMA, OdomEstimator_wys, OdomEstimator_Legolas, OdomEstimator_baseline
 from utils.dataset import Dataset
 from envs.T1_run_act_history import T1RunActHistoryEnv
-
+import datetime
 
 if __name__ == "__main__":
-    dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
+    dir = os.path.join("logs/traj", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
     os.makedirs(dir, exist_ok=True)
     env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 1, "cuda:0", False, curriculum=False, change_cmd=False) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
@@ -31,7 +31,6 @@ if __name__ == "__main__":
     model.load_state_dict(state_dict["model"])
     recorder = SummaryWriter(dir)
 
-    stacked_odom_pos = torch.zeros(env.num_envs, env.obs_stacking, 2, device=env.device)
     baseline_origin_pos = torch.zeros(env.num_envs, 2, device=env.device)
     baseline_origin_yaw = torch.zeros(env.num_envs, device=env.device)
 
@@ -40,6 +39,7 @@ if __name__ == "__main__":
     odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
     odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(env.device)
     odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(env.device)
+
     yaw_history = infos["yaw_history"].to(env.device)
     pos_history = infos["pos_history"].to(env.device)
     pos_groundtruth = infos["pos_groundtruth"].to(env.device)
@@ -48,21 +48,21 @@ if __name__ == "__main__":
     odom = infos["odom"].to(env.device)
 
 
-    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-18-10-43-25/model_wys_1000.pth"
+    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-21-46-21/model_wys_900.pth"
     if latest_wys_model_path:
         checkpoint = torch.load(latest_wys_model_path)
         odom_model_wys.load_state_dict(checkpoint['model'])
         optimizer_wys.load_state_dict(checkpoint['optimizer'])
         print(f"Loaded model from {latest_wys_model_path}")
     
-    latest_Legolas_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-18-10-43-25/model_Legolas_1000.pth"
+    latest_Legolas_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-21-46-21/model_Legolas_900.pth"
     if latest_Legolas_model_path:
         checkpoint = torch.load(latest_Legolas_model_path)
         odom_model_Legolas.load_state_dict(checkpoint['model'])
         optimizer_Legolas.load_state_dict(checkpoint['optimizer'])
         print(f"Loaded model from {latest_Legolas_model_path}")
     
-    latest_baseline_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-18-10-43-25/model_baseline_1000.pth"
+    latest_baseline_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-21-46-21/model_baseline_900.pth"
     if latest_baseline_model_path:
         checkpoint = torch.load(latest_baseline_model_path)
         odom_model_baseline.load_state_dict(checkpoint['model'])
@@ -70,18 +70,17 @@ if __name__ == "__main__":
         print(f"Loaded model from {latest_baseline_model_path}")
 
     odom_pred_wys_pos_list = list() # x_i
-    # 添加五十个零向量
     for i in range(50):
         odom_pred_wys_pos_list.append(torch.zeros(env.num_envs, 2, device=env.device))
+    
     odom_pred_Legolas_pos_list = list() # x_i
-    # 添加五十个零向量
-    for i in range(50):
-        odom_pred_Legolas_pos_list.append(torch.zeros(env.num_envs, 2, device=env.device))
+    odom_pred_Legolas_pos_list.append(torch.zeros(env.num_envs, 2, device=env.device))
+
     odom_groundtruth_list = list()
+    odom_groundtruth_list.append(pos_groundtruth)
 
     odom_pred_baseline_pos_list = list() # x_i
-    for i in range(50):
-        odom_pred_baseline_pos_list.append(torch.zeros(env.num_envs, 2, device=env.device))
+    odom_pred_baseline_pos_list.append(torch.zeros(env.num_envs, 2, device=env.device))
 
 
     import matplotlib.pyplot as plt
@@ -101,6 +100,22 @@ if __name__ == "__main__":
     line4, = ax.plot([], [], label="odom_pred_pos_baseline")
     ax.legend()
 
+    # 创建文件路径
+    wys_file = os.path.join(dir, "odom_pred_wys_pos.txt")
+    legolas_file = os.path.join(dir, "odom_pred_Legolas_pos.txt")
+    groundtruth_file = os.path.join(dir, "odom_groundtruth.txt")
+    baseline_file = os.path.join(dir, "odom_pred_baseline_pos.txt")
+
+    # # 添加表头
+    # with open(wys_file, "w") as f:
+    #     f.write("timestamp x y z qx qy qz qw\n")
+    # with open(legolas_file, "w") as f:
+    #     f.write("timestamp x y z qx qy qz qw\n")
+    # with open(groundtruth_file, "w") as f:
+    #     f.write("timestamp x y z qx qy qz qw\n")
+    # with open(baseline_file, "w") as f:
+    #     f.write("timestamp x y z qx qy qz qw\n")
+
     for i in range(1000):
         obs_m = env.mirror_obs(obs)
         obs_history_m = env.mirror_obs(obs_history)
@@ -110,8 +125,18 @@ if __name__ == "__main__":
             act_mean = (dist.loc + env.mirror_act(dist_m.loc)) * 0.5
             act_std = dist.scale
             act = act_mean + act_std * torch.randn_like(act_std)
+        obs, rew, done, infos = env.step(act) # x_i
+        obs_history = infos["obs_history"].to(env.device)
+        odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
+        odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(env.device)
+        yaw_history = infos["yaw_history"].to(env.device) # [num_envs, obs_stacking] yaw_{i-49} ~ yaw_i
+        pos_history = infos["pos_history"].to(env.device)# [num_envs, obs_stacking + 1, 2] x_{i-50}-x_{i-50} ~ x_i - x_{i-50}
+        pos_groundtruth = infos["pos_groundtruth"].to(env.device) # [num_envs, 2] x_i
+        abs_yaw_history = infos["abs_yaw_history"].to(env.device)
+        start_mask = infos["start_mask"].to(env.device)
+        odom = infos["odom"].to(env.device)
 
-        tmp_pos = torch.stack(odom_pred_wys_pos_list[-50:], dim=1) # 世界坐标系下的x_{i-50} ~ x_i（预测的）
+        tmp_pos = torch.stack(odom_pred_wys_pos_list[-50:], dim=1) # 世界坐标系下的x_{i-49} ~ x_i（预测的）
 
         pos_input = torch.stack(
             (
@@ -128,7 +153,7 @@ if __name__ == "__main__":
                 torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] + torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 1]
             ),
             dim=-1
-        ) # x_i = d_i + x_i-1[num_envs, 2]
+        ) # x_i+1
 
         odom_pred_Legolas = odom_model_Legolas(odom_obs_history_Legolas, yaw_history)
         # odom_pred_Legolas = odom_model_Legolas(odom_obs_history_Legolas.unsqueeze(0), yaw_history.unsqueeze(0)).squeeze(0)
@@ -161,6 +186,33 @@ if __name__ == "__main__":
         odom_pred_baseline_pos_list.append(odom_pred_baseline_pos)
         odom_groundtruth_list.append(groundtruth)
 
+        # 获取当前 Unix 时间戳
+        timestamp = time.time()
+
+        # 写入 odom_pred_wys_pos_list
+        with open(wys_file, "a") as f:
+            for env_idx in range(env.num_envs):
+                x, y = odom_pred_wys_pos[env_idx].detach().cpu().numpy()
+                f.write(f"{timestamp} {x} {y} 0 0 0 0 1\n")  # TUM 格式
+
+        # 写入 odom_pred_Legolas_pos_list
+        with open(legolas_file, "a") as f:
+            for env_idx in range(env.num_envs):
+                x, y = odom_pred_Legolas_pos[env_idx].detach().cpu().numpy()
+                f.write(f"{timestamp} {x} {y} 0.0 0.0 0.0 0.0 1.0\n")  # TUM 格式
+
+        # 写入 odom_groundtruth_list
+        with open(groundtruth_file, "a") as f:
+            for env_idx in range(env.num_envs):
+                x, y = groundtruth[env_idx].detach().cpu().numpy()
+                f.write(f"{timestamp} {x} {y} 0.0 0.0 0.0 0.0 1.0\n")  # TUM 格式
+
+        # 写入 odom_pred_baseline_pos_list
+        with open(baseline_file, "a") as f:
+            for env_idx in range(env.num_envs):
+                x, y = odom_pred_baseline_pos[env_idx].detach().cpu().numpy()
+                f.write(f"{timestamp} {x} {y} 0.0 0.0 0.0 0.0 1.0\n")  # TUM 格式
+
         # 更新绘图数据
         odom_pred_wys_pos_array[i] = odom_pred_wys_pos.detach().cpu().numpy()
         odom_groundtruth_array[i] = groundtruth.detach().cpu().numpy()
@@ -175,17 +227,7 @@ if __name__ == "__main__":
         plt.draw()
         plt.pause(0.01)
 
-        obs, rew, done, infos = env.step(act)
-        obs_history = infos["obs_history"].to(env.device)
-        odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
-        odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(env.device)
-        odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(env.device)
-        yaw_history = infos["yaw_history"].to(env.device) # [num_envs, obs_stacking] yaw_{i-49} ~ yaw_i
-        pos_history = infos["pos_history"].to(env.device)# [num_envs, obs_stacking + 1, 2] x_{i-50}-x_{i-50} ~ x_i - x_{i-50}
-        pos_groundtruth = infos["pos_groundtruth"].to(env.device) # [num_envs, 2] x_i
-        abs_yaw_history = infos["abs_yaw_history"].to(env.device)
-        start_mask = infos["start_mask"].to(env.device)
-        odom = infos["odom"].to(env.device)
+        
 
 
     # 关闭交互模式并显示最终图像
@@ -193,4 +235,4 @@ if __name__ == "__main__":
     plt.show()
 
 
-            
+

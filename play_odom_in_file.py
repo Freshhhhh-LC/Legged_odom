@@ -8,8 +8,8 @@ from utils.model import OdomEstimator_wys, OdomEstimator_Legolas, OdomEstimator_
 from utils.wrapper_file import OdomStackingDataEnvFromFile
 
 OBS_STACKING = 50
-DATA_INDEX = "1"
-DATA_NAME = "booster_seg_9.89s.csv"
+DATA_INDEX = "4"
+DATA_NAME = "booster_seg_9.82s.csv"
 
 if __name__ == "__main__":
     dir  = os.path.join("data", DATA_INDEX, "segments")
@@ -39,7 +39,8 @@ if __name__ == "__main__":
     # odom = infos["odom"].to(device)
 
 
-    latest_wys_model_path = "/home/luochangsheng/odom/Legged_odom/logs/model_wys_1000.pth"
+    # latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/retrain_model_wys_10.pth"
+    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-21-46-21/model_wys_900.pth"
     if latest_wys_model_path:
         checkpoint = torch.load(latest_wys_model_path)
         odom_model_wys.load_state_dict(checkpoint['model'])
@@ -91,6 +92,16 @@ if __name__ == "__main__":
     ax.legend()
 
     for i in range(num_steps):
+        infos, done = env.step()
+        odom_obs_history_wys = infos["odom_obs_history_wys"].to(device)
+        # odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(device)
+        # odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(device)
+        yaw_history = infos["yaw_history"].to(device) # [num_envs, obs_stacking] yaw_{i-49} ~ yaw_i
+        pos_history = infos["pos_history"].to(device)# [num_envs, obs_stacking + 1, 2] x_{i-50}-x_{i-50} ~ x_i - x_{i-50}
+        pos_groundtruth = infos["pos_groundtruth"].to(device) # [num_envs, 2] x_i
+        abs_yaw_history = infos["abs_yaw_history"].to(device)
+        # start_mask = infos["start_mask"].to(device)
+        # odom = infos["odom"].to(device)
 
         tmp_pos = torch.stack(odom_pred_wys_pos_list[-50:], dim=0) # 世界坐标系下的x_{i-50} ~ x_i（预测的）
 
@@ -102,6 +113,8 @@ if __name__ == "__main__":
             dim=-1
         ) # 输入的坐标要转为机器人初始坐标系下的坐标
         odom_pred_wys = odom_model_wys(odom_obs_history_wys, yaw_history, pos_input)
+        # print("shape", odom_pred_wys.shape)
+        print("loss", F.mse_loss(odom_pred_wys, pos_history[-1] - pos_history[-2]))
         
         odom_pred_wys_pos = torch.stack(
             (
@@ -156,22 +169,11 @@ if __name__ == "__main__":
         # plt.draw()
         plt.pause(0.01)
 
-        infos = env.step()
-        odom_obs_history_wys = infos["odom_obs_history_wys"].to(device)
-        # odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(device)
-        # odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(device)
-        yaw_history = infos["yaw_history"].to(device) # [num_envs, obs_stacking] yaw_{i-49} ~ yaw_i
-        pos_history = infos["pos_history"].to(device)# [num_envs, obs_stacking + 1, 2] x_{i-50}-x_{i-50} ~ x_i - x_{i-50}
-        pos_groundtruth = infos["pos_groundtruth"].to(device) # [num_envs, 2] x_i
-        abs_yaw_history = infos["abs_yaw_history"].to(device)
-        # start_mask = infos["start_mask"].to(device)
-        # odom = infos["odom"].to(device)
-
 
     # 关闭交互模式并显示最终图像
     plt.ioff()
     plt.savefig("odom_pred.png")
-    # plt.show()
+    plt.show()
 
 
             

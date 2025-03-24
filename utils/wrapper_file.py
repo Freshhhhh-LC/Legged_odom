@@ -29,10 +29,20 @@ class OdomStackingDataEnvFromFile:
         
         self.start_yaw_of_segment = torch.tensor([float(self.row[1])], device=device)
         self.start_pos_of_segment = torch.tensor([float(self.row[59]), float(self.row[60])], device=device)
-        self.infos = {}
         self.num_rows = 0
         for row in self.data_reader:
             self.num_rows += 1
+        
+        self.q0 = torch.zeros(13, device=self.device)
+        # ankle
+        # self.q0[0, [1, 7]] = -0.2
+        # self.q0[0, [4, 10]] = 0.4
+        # self.q0[0, [5, 11]] = -0.25
+        self.q0[[1, 7]] = -0.2
+        self.q0[[4, 10]] = 0.4
+        self.q0[[5, 11]] = -0.25
+
+
         
     def reset(self):
         self.data_file.seek(0)
@@ -49,10 +59,18 @@ class OdomStackingDataEnvFromFile:
         dq = dq * 0.1 
         self.odom_obs_history_wys[:] = torch.cat((project_gravity, ang_vel, q, dq)).unsqueeze(0)
         
-        yaw = torch.tensor([float(self.row[61]) - self.start_yaw_of_segment[0]], device=self.device)
+        yaw = torch.tensor([float(self.row[1]) - self.start_yaw_of_segment[0]], device=self.device)
         self.yaw_history[:] = yaw.unsqueeze(0)
         
         pos_groundtruth = torch.tensor([float(self.row[59]) - self.start_pos_of_segment[0], float(self.row[60]) - self.start_pos_of_segment[1]], device=self.device)
+
+        pos_groundtruth = torch.stack(
+            (
+                torch.cos(self.start_yaw_of_segment[0]) * (pos_groundtruth[0]) + torch.sin(self.start_yaw_of_segment[0]) * (pos_groundtruth[1]),
+                -torch.sin(self.start_yaw_of_segment[0]) * (pos_groundtruth[0]) + torch.cos(self.start_yaw_of_segment[0]) * (pos_groundtruth[1]),
+            ),
+            dim=-1,
+        )
         
         infos = {
             "odom_obs_history_wys": self.odom_obs_history_wys,
@@ -65,24 +83,36 @@ class OdomStackingDataEnvFromFile:
     
     def step(self):
         self.row = next(self.data_reader)
+        if self.row is None:
+            return None, True
         project_gravity = torch.tensor([float(self.row[2]), float(self.row[3]), float(self.row[4])], device=self.device)
         ang_vel = torch.tensor([float(self.row[5]), float(self.row[6]), float(self.row[7])], device=self.device)
-        q = torch.tensor([float(self.row[i]) for i in range(21, 34)], device=self.device)
+        q = torch.tensor([float(self.row[i]) for i in range(21, 34)], device=self.device) - self.q0
         dq = torch.tensor([float(self.row[i]) for i in range(44, 57)], device=self.device)
         dq = dq * 0.1
         
         self.odom_obs_history_wys = torch.roll(self.odom_obs_history_wys, -1, dims=0)
+        # print("cat", torch.cat((project_gravity, ang_vel, q, dq)).unsqueeze(0).shape)
+        # print("-1", self.odom_obs_history_wys[-1].shape)
         self.odom_obs_history_wys[-1] = torch.cat((project_gravity, ang_vel, q, dq)).unsqueeze(0)
         
-        yaw = torch.tensor([float(self.row[61]) - self.start_yaw_of_segment[0]], device=self.device)
+        yaw = torch.tensor([float(self.row[1]) - self.start_yaw_of_segment[0]], device=self.device)
         self.yaw_history = torch.roll(self.yaw_history, -1, dims=0)
         self.yaw_history[-1] = yaw
         
-        self.pos_history = torch.roll(self.pos_history, -1, dims=0)
-        self.pos_history[-1] = torch.tensor([float(self.row[59]) - self.start_pos_of_segment[0], float(self.row[60]) - self.start_pos_of_segment[1]], device=self.device)
-        
         pos_groundtruth = torch.tensor([float(self.row[59]) - self.start_pos_of_segment[0], float(self.row[60]) - self.start_pos_of_segment[1]], device=self.device)
-        
+
+        pos_groundtruth = torch.stack(
+            (
+                torch.cos(self.start_yaw_of_segment[0]) * (pos_groundtruth[0]) + torch.sin(self.start_yaw_of_segment[0]) * (pos_groundtruth[1]),
+                -torch.sin(self.start_yaw_of_segment[0]) * (pos_groundtruth[0]) + torch.cos(self.start_yaw_of_segment[0]) * (pos_groundtruth[1]),
+            ),
+            dim=-1,
+        ) # 转为机器人初始坐标系下的坐标
+
+        self.pos_history = torch.roll(self.pos_history, -1, dims=0)
+        self.pos_history[-1] = pos_groundtruth # 机器人初始坐标系下的坐标
+
         infos = {
             "odom_obs_history_wys": self.odom_obs_history_wys,
             "yaw_history": self.yaw_history - self.yaw_history[0].unsqueeze(0),
@@ -99,4 +129,4 @@ class OdomStackingDataEnvFromFile:
             "abs_yaw_history": self.yaw_history,
         }
         
-        return infos
+        return infos, False

@@ -14,7 +14,7 @@ from envs.T1_run_act_history import T1RunActHistoryEnv
 if __name__ == "__main__":
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
     os.makedirs(dir, exist_ok=True)
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 4096, "cuda:1", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 256, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
     odom_model_wys = OdomEstimator_wys(32 + 4, env.obs_stacking).to(env.device)
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     buf.AddBuffer("odom_obs_history_baseline", (env.obs_stacking, 45), device=env.device)
     buf.AddBuffer("yaw_history", (env.obs_stacking,), device=env.device)
     buf.AddBuffer("pos_history", (env.obs_stacking + 1, 2), device=env.device)
-    buf.AddBuffer("pred_pos_history", (env.obs_stacking, 2), device=env.device)
+    buf.AddBuffer("pred_pos_history", (env.obs_stacking + 1, 2), device=env.device)
     buf.AddBuffer("abs_yaw_history", (env.obs_stacking,), device=env.device)
     buf.AddBuffer("start_mask", (env.obs_stacking,), device=env.device)
     buf.AddBuffer("odom", (2,), device=env.device)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     start_mask = infos["start_mask"].to(env.device)
     odom = infos["odom"].to(env.device)
     # [batch_size, num_envs, num_stack, 2]
-    pred_pos_history = torch.zeros(env.num_envs, env.obs_stacking, 2, device=env.device) # 前50帧在地面坐标系下的位置
+    pred_pos_history = torch.zeros(env.num_envs, env.obs_stacking + 1, 2, device=env.device)
 
     for i in range(60000):
         for j in range(24):
@@ -80,6 +80,7 @@ if __name__ == "__main__":
             buf.Record("abs_yaw_history", j, abs_yaw_history)
             buf.Record("start_mask", j, start_mask)
             buf.Record("odom", j, odom)
+            buf.Record("pred_pos_history", j, pred_pos_history) #用前面的所有buf来预测出来的pos，记前面的为yaw_i，则这里为x_i-48~x_i+1 (50)
             obs_m = env.mirror_obs(obs)
             obs_history_m = env.mirror_obs(obs_history)
             with torch.no_grad():
@@ -100,26 +101,25 @@ if __name__ == "__main__":
             odom = infos["odom"].to(env.device)
             pos_input = torch.stack(
                 (
-                    torch.cos(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 0] - pred_pos_history[:, 0, 0].unsqueeze(1)) + torch.sin(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 1] - pred_pos_history[:, 0, 1].unsqueeze(1)),
-                    -torch.sin(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 0] - pred_pos_history[:, 0, 0].unsqueeze(1)) + torch.cos(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 1] - pred_pos_history[:, 0, 1].unsqueeze(1))
+                    torch.cos(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 0] - pred_pos_history[:, 1, 0].unsqueeze(1)) + torch.sin(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 1] - pred_pos_history[:, 1, 1].unsqueeze(1)),
+                    -torch.sin(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 0] - pred_pos_history[:, 1, 0].unsqueeze(1)) + torch.cos(abs_yaw_history[:, 0].unsqueeze(1)) * (pred_pos_history[:, :, 1] - pred_pos_history[:, 1, 1].unsqueeze(1))
                 ),
                 dim=-1
             )
             with torch.no_grad(): # 本次预测不需要梯度
-                odom_pred_wys = odom_model_wys(odom_obs_history_wys, yaw_history, pos_input) # 预测的x_i+1 - x_i
+                odom_pred_wys = odom_model_wys(odom_obs_history_wys, yaw_history, pos_input[:, 1:]) # 预测的x_i+1 - x_i
             odom_pred_wys_pos = torch.stack(
             (
                 torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] - torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + pred_pos_history[:, -1, 0],
                 torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] + torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + pred_pos_history[:, -1, 1]
             ),
             dim=-1
-            )
+            ) # x_i+1
             pred_pos_history = torch.roll(pred_pos_history, -1, dims=1)
             # print("done.shape", done.shape)
             pred_pos_history[done,:,0:2] = odom_pred_wys_pos[done,0:2].unsqueeze(1)
             pred_pos_history[:, -1, :] = odom_pred_wys_pos
-            buf.Record("pred_pos_history", j, pred_pos_history)
-
+            
         use_pred_pos = True
         odom_loss_list_wys = list()
         for j in range(20):
@@ -133,7 +133,7 @@ if __name__ == "__main__":
                     ),
                     dim=-1
                 )
-                odom_pred_wys = odom_model_wys(buf["odom_obs_history_wys"], buf["yaw_history"], pos_input)
+                odom_pred_wys = odom_model_wys(buf["odom_obs_history_wys"], buf["yaw_history"], pos_input[:, :, :-1, :])
             odom_loss_wys = F.mse_loss(odom_pred_wys, buf["pos_history"][..., -1, :] - buf["pos_history"][..., -2, :])
             optimizer_wys.zero_grad()
             odom_loss_wys.backward(retain_graph=True)
