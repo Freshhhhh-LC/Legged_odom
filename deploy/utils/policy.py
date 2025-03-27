@@ -138,13 +138,14 @@ class OdomPolicy:
         self.stacked_obs_init = False
         self.policy_interval = self.cfg["common"]["dt"] * self.cfg["policy"]["control"]["decimation"]
 
-    def inference(self, dof_pos, dof_vel, base_ang_vel, projected_gravity, base_yaw):
+    def inference(self, dof_pos, dof_vel, base_ang_vel, projected_gravity, base_yaw, base_acc):
         self.base_yaw = base_yaw
         self.stacked_odom_obs[1:, :] = self.stacked_odom_obs[:-1, :]
         self.stacked_odom_obs[0, 0:3] = projected_gravity * self.cfg["policy"]["normalization"]["gravity"]
         self.stacked_odom_obs[0, 0:3] = base_ang_vel * self.cfg["policy"]["normalization"]["ang_vel"]
         self.stacked_odom_obs[0, 6:19] = (dof_pos - self.default_dof_pos)[10:] * self.cfg["policy"]["normalization"]["dof_pos"]
         self.stacked_odom_obs[0, 19:32] = dof_vel[10:] * self.cfg["policy"]["normalization"]["dof_vel"]
+        self.stacked_odom_obs[0, 32:35] = base_acc * self.cfg["policy"]["normalization"]["base_acc"]
         self.stacked_yaw[1:] = self.stacked_yaw[:-1]
         self.stacked_yaw[0] = base_yaw
         local_odom = (

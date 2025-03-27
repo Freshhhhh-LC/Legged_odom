@@ -39,7 +39,7 @@ policy:
   odom_policy_path: "/home/wys/lcs/Legged_odom/logs/2025-03-18-10-43-25/model_wys_1000.pth"
   num_actions: 13
   num_observations: 57
-  num_odom_obs: 32
+  num_odom_obs: 35
   num_stack: 50
   gait_frequency: 2
 
@@ -50,6 +50,7 @@ policy:
     dof_pos: 1.0
     dof_vel: 0.1
     clip_actions: 1.
+    base_acc: 0.1
 
   control:
     action_scale: 1.

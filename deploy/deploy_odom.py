@@ -90,6 +90,7 @@ class OdomController:
                 self.base_yaw_zero = low_state_msg.imu_state.rpy[2]
             self.base_yaw = low_state_msg.imu_state.rpy[2] - self.base_yaw_zero
             self.base_ang_vel[:] = low_state_msg.imu_state.gyro
+            self.base_acc = low_state_msg.imu_state.acc
             for i, motor in enumerate(low_state_msg.motor_state_serial):
                 self.dof_pos[i] = motor.q
                 self.dof_vel[i] = motor.dq
@@ -116,13 +117,12 @@ class OdomController:
         start_time = time.perf_counter()
 
         self.odom_pos = self.policy.inference(
-            time_now=time_now,
             dof_pos=self.dof_pos,
             dof_vel=self.dof_vel,
             base_ang_vel=self.base_ang_vel,
             projected_gravity=self.projected_gravity,
             base_yaw=self.base_yaw,
-            ball_pos=self.ros_node.ball_pos,
+            base_acc=self.base_acc,
         )
         
         
