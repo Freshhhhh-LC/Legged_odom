@@ -13,7 +13,7 @@ DATA_INDEXES = ["1", "2", "3", "4"]
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    odom_model_wys = OdomEstimator_wys(32 + 4, OBS_STACKING).to(device)
+    odom_model_wys = OdomEstimator_wys(35 + 4, OBS_STACKING).to(device)
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=1e-6)
     latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-10-47-15/model_wys_1700.pth"
     if latest_wys_model_path:
@@ -32,7 +32,7 @@ if __name__ == "__main__":
                 env = OdomStackingDataEnvFromFile(data_file_path, OBS_STACKING, device)
 
                 buf = Dataset(24, 1)
-                buf.AddBuffer("odom_obs_history_wys", (OBS_STACKING, 32), device=device)
+                buf.AddBuffer("odom_obs_history_wys", (OBS_STACKING, 35), device=device)
                 buf.AddBuffer("yaw_history", (OBS_STACKING,), device=device)
                 buf.AddBuffer("pos_history", (OBS_STACKING + 1, 2), device=device)
                 buf.AddBuffer("pred_pos_history", (OBS_STACKING + 1, 2), device=device)

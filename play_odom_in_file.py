@@ -17,7 +17,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    odom_model_wys = OdomEstimator_wys(32 + 4, OBS_STACKING).to(device)
+    odom_model_wys = OdomEstimator_wys(35 + 4, OBS_STACKING).to(device)
 
     # odom_model_Legolas = OdomEstimator_Legolas(46 + 2, OBS_STACKING).to(device)
 

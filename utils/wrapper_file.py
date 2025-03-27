@@ -21,7 +21,7 @@ class OdomStackingDataEnvFromFile:
         # 62:64 "ball_x", "ball_y"
         
         self.next_row = next(self.data_reader) # next() to get the second row
-        self.odom_obs_history_wys = torch.zeros(self.obs_stacking, 32, device=device)
+        self.odom_obs_history_wys = torch.zeros(self.obs_stacking, 35, device=device)
         # self.odom_obs_history_baseline = torch.zeros(self.obs_stacking, 45, device=device)
         self.yaw_history = torch.zeros(self.obs_stacking, device=device)
         self.pos_history = torch.zeros(self.obs_stacking + 1, 2, device=device)
@@ -57,7 +57,9 @@ class OdomStackingDataEnvFromFile:
         q = torch.tensor([float(self.row[i]) for i in range(21, 34)], device=self.device)
         dq = torch.tensor([float(self.row[i]) for i in range(44, 57)], device=self.device)
         dq = dq * 0.1 
-        self.odom_obs_history_wys[:] = torch.cat((project_gravity, ang_vel, q, dq)).unsqueeze(0)
+        acc = torch.tensor([float(self.row[8]), float(self.row[9]), float(self.row[10])], device=self.device)
+        acc = acc * 0.1
+        self.odom_obs_history_wys[:] = torch.cat((project_gravity, ang_vel, q, dq, acc)).unsqueeze(0)
         
         yaw = torch.tensor([float(self.row[1]) - self.start_yaw_of_segment[0]], device=self.device)
         self.yaw_history[:] = yaw.unsqueeze(0)
@@ -90,11 +92,13 @@ class OdomStackingDataEnvFromFile:
         q = torch.tensor([float(self.row[i]) for i in range(21, 34)], device=self.device) - self.q0
         dq = torch.tensor([float(self.row[i]) for i in range(44, 57)], device=self.device)
         dq = dq * 0.1
+        acc = torch.tensor([float(self.row[8]), float(self.row[9]), float(self.row[10])], device=self.device)
+        acc = acc * 0.1
         
         self.odom_obs_history_wys = torch.roll(self.odom_obs_history_wys, -1, dims=0)
         # print("cat", torch.cat((project_gravity, ang_vel, q, dq)).unsqueeze(0).shape)
         # print("-1", self.odom_obs_history_wys[-1].shape)
-        self.odom_obs_history_wys[-1] = torch.cat((project_gravity, ang_vel, q, dq)).unsqueeze(0)
+        self.odom_obs_history_wys[-1] = torch.cat((project_gravity, ang_vel, q, dq, acc)).unsqueeze(0)
         
         yaw = torch.tensor([float(self.row[1]) - self.start_yaw_of_segment[0]], device=self.device)
         self.yaw_history = torch.roll(self.yaw_history, -1, dims=0)

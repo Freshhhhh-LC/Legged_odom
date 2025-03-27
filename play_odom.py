@@ -18,7 +18,7 @@ if __name__ == "__main__":
     env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 1, "cuda:0", False, curriculum=False, change_cmd=False) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
-    odom_model_wys = OdomEstimator_wys(32 + 4, env.obs_stacking).to(env.device)
+    odom_model_wys = OdomEstimator_wys(35 + 4, env.obs_stacking).to(env.device)
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
 
     odom_model_Legolas = OdomEstimator_Legolas(46 + 2, env.obs_stacking).to(env.device)
