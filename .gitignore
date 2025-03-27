@@ -1,4 +1,5 @@
 models/
 logs/
 data/
+nohup.out
 __pycache__
