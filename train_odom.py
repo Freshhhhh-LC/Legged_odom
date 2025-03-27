@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # [batch_size, num_envs, num_stack, 2]
     pred_pos_history = torch.zeros(env.num_envs, env.obs_stacking + 1, 2, device=env.device)
 
-    for i in range(60000):
+    for i in range(2000):
         for j in range(24):
             buf.Record("obs_history", j, obs_history)
             buf.Record("odom_obs_history_wys", j, odom_obs_history_wys)

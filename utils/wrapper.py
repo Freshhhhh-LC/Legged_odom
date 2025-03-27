@@ -2,6 +2,7 @@ from isaacgym import gymtorch, gymapi, gymutil
 from isaacgym.torch_utils import get_euler_xyz
 
 import torch
+from isaacgym.torch_utils import quat_rotate_inverse
 
 
 def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
@@ -28,8 +29,10 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             self.obs_history[:, :, :] = obs.unsqueeze(1)
             self.odom_obs_history_wys[:, :, 0:6] = obs[:, 0:6].unsqueeze(1)
             self.odom_obs_history_wys[:, :, 6:32] = obs[:, 13:39].unsqueeze(1)
-            acc = self.root_acc[:, 0:3] * 0.1 + torch.randn_like(self.root_acc[:, 0:3]) * 0.01
-            self.odom_obs_history_wys[:, :, 32:35] = acc.unsqueeze(1) # [num_envs, obs_stacking, 3]
+            # acc = self.root_acc[:, 0:3] * 0.1 + torch.randn_like(self.root_acc[:, 0:3]) * 0.01
+            acc = self.root_acc[:, 0:3]
+            local_acc = quat_rotate_inverse(self.root_states[:, 3:7], acc) * 0.1 + torch.randn_like(acc) * 0.01
+            self.odom_obs_history_wys[:, :, 32:35] = local_acc.unsqueeze(1) # local acc
 
 
             self.odom_obs_history_Legolas[:, :, 0:9] = obs[:, 0:9].unsqueeze(1)
@@ -71,8 +74,11 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             self.odom_obs_history_wys[done, :, 6:32] = obs[done, 13:39].unsqueeze(1)
             self.odom_obs_history_wys[:, -1, 0:6] = obs[:, 0:6]
             self.odom_obs_history_wys[:, -1, 6:32] = obs[:, 13:39]
-            self.odom_obs_history_wys[done, :, 32:35] = self.root_acc[done, 0:3].unsqueeze(1)
-            self.odom_obs_history_wys[:, -1, 32:35] = self.root_acc[:, 0:3] * 0.1
+            acc = self.root_acc[:, 0:3]
+            local_acc = quat_rotate_inverse(self.root_states[:, 3:7], acc) * 0.1 + torch.randn_like(acc) * 0.01
+            self.odom_obs_history_wys[done, :, 32:35] = local_acc[done].unsqueeze(1)
+            self.odom_obs_history_wys[:, -1, 32:35] = local_acc
+            
 
             self.odom_obs_history_Legolas[:] = torch.roll(self.odom_obs_history_Legolas, -1, dims=1)
             self.odom_obs_history_Legolas[done, :, 0:9] = obs[done, 0:9].unsqueeze(1)
