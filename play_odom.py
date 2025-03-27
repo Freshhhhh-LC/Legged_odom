@@ -48,26 +48,20 @@ if __name__ == "__main__":
     odom = infos["odom"].to(env.device)
 
 
-    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-21-46-21/model_wys_900.pth"
+    latest_wys_model_path = "/home/lcs/RCL_Project/Legged_odom/models/model_wys.pt"
     if latest_wys_model_path:
-        checkpoint = torch.load(latest_wys_model_path)
-        odom_model_wys.load_state_dict(checkpoint['model'])
-        optimizer_wys.load_state_dict(checkpoint['optimizer'])
-        print(f"Loaded model from {latest_wys_model_path}")
+        odom_model_wys = torch.jit.load(latest_wys_model_path).to(env.device)
+        print(f"Loaded TorchScript model from {latest_wys_model_path}")
     
-    latest_Legolas_model_path = "/home/lcs/RCL_Project/Legged_odom/logs/2025-03-24-21-46-21/model_Legolas_900.pth"
+    latest_Legolas_model_path = "/home/lcs/RCL_Project/Legged_odom/models/model_Legolas.pt"
     if latest_Legolas_model_path:
-        checkpoint = torch.load(latest_Legolas_model_path)
-        odom_model_Legolas.load_state_dict(checkpoint['model'])
-        optimizer_Legolas.load_state_dict(checkpoint['optimizer'])
-        print(f"Loaded model from {latest_Legolas_model_path}")
+        odom_model_Legolas = torch.jit.load(latest_Legolas_model_path).to(env.device)
+        print(f"Loaded TorchScript model from {latest_Legolas_model_path}")
     
-    latest_baseline_model_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-03-27-11-20-54/model_baseline_1900.pt"
+    latest_baseline_model_path = "/home/lcs/RCL_Project/Legged_odom/models/model_baseline.pt"
     if latest_baseline_model_path:
-        checkpoint = torch.load(latest_baseline_model_path)
-        odom_model_baseline.load_state_dict(checkpoint['model'])
-        optimizer_baseline.load_state_dict(checkpoint['optimizer'])
-        print(f"Loaded model from {latest_baseline_model_path}")
+        odom_model_baseline = torch.jit.load(latest_baseline_model_path).to(env.device)
+        print(f"Loaded TorchScript model from {latest_baseline_model_path}")
 
     odom_pred_wys_pos_list = list() # x_i
     for i in range(50):
