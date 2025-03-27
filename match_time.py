@@ -62,7 +62,7 @@ for i in range(1, 8):
     continuous_segments = [round(s, 2) for s in continuous_segments]
     print("Continuous segment durations:", continuous_segments)
 
-    # 保存超过3秒的连续数据段
+    # 保存超过9秒的连续数据段
     output_dir = os.path.join(dir, "segments")
     os.makedirs(output_dir, exist_ok=True)
 
