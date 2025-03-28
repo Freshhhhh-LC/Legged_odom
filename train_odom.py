@@ -14,7 +14,7 @@ from envs.T1_run_act_history import T1RunActHistoryEnv
 if __name__ == "__main__":
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
     os.makedirs(dir, exist_ok=True)
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 256, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
     odom_model_wys = OdomEstimator_wys(35 + 4, env.obs_stacking).to(env.device)
@@ -144,10 +144,14 @@ if __name__ == "__main__":
 
         if i % 10 == 9:
             print(f"iter: {i + 1}, \todom_loss_wys: {odom_loss_mean_wys}")
-        if i % 100 == 99:
+        if i % 10 == 9:
             # 保存为 TorchScript 格式
+            odom_model_wys.eval()
+            odom_model_wys.cpu()
             scripted_model = torch.jit.script(odom_model_wys)
             scripted_model.save(os.path.join(dir, f"model_wys_{i + 1}.pt"))
+            odom_model_wys.to(env.device)
+            odom_model_wys.train()
         
         odom_loss_list_Legolas = list()
         for j in range(20):
