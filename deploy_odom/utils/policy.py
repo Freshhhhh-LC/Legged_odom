@@ -105,8 +105,8 @@ class Policy:
             .detach()
             .numpy()
         )[0]
-        self.odom_pos[0] = np.cos(self.stacked_yaw[-1]) * local_odom[0] - np.sin(self.stacked_yaw[-1]) * local_odom[1] + self.stacked_pos[-1, 0]
-        self.odom_pos[1] = np.sin(self.stacked_yaw[-1]) * local_odom[0] + np.cos(self.stacked_yaw[-1]) * local_odom[1] + self.stacked_pos[-1, 1]
+        self.odom_pos[0] = np.cos(self.stacked_yaw[-1]) * local_odom[0] - np.sin(self.stacked_yaw[-1]) * local_odom[1] + self.stacked_pos[0, 0]
+        self.odom_pos[1] = np.sin(self.stacked_yaw[-1]) * local_odom[0] + np.cos(self.stacked_yaw[-1]) * local_odom[1] + self.stacked_pos[0, 1]
         self.stacked_pos[1:, :] = self.stacked_pos[:-1, :]
         self.stacked_pos[0, :] = self.odom_pos
         self.logger.debug(f"Odom: {self.odom_pos}")
@@ -115,9 +115,11 @@ class Policy:
         return self.dof_targets
 
 class OdomPolicy:
-    def __init__(self, cfg):
+    def __init__(self, cfg, delta_time, use_accel):
         device = torch.device("cpu")
         self.logger = logging.getLogger(__name__)
+        self.delta_time = delta_time
+        self.use_accel = use_accel
         self.cfg = cfg
         try:
             print(self.cfg["policy"]["odom_policy_path"])
@@ -133,8 +135,8 @@ class OdomPolicy:
 
     def _init_inference_variables(self):
         self.stacked_odom_obs = np.zeros((self.cfg["policy"]["num_stack"], self.cfg["policy"]["num_odom_obs"]), dtype=np.float32)
-        self.stacked_yaw = np.zeros(self.cfg["policy"]["num_stack"], dtype=np.float32)
-        self.stacked_pos = np.zeros((self.cfg["policy"]["num_stack"], 2), dtype=np.float32)
+        self.stacked_yaw = np.zeros(self.cfg["policy"]["num_stack"] + 1, dtype=np.float32)
+        self.stacked_pos = np.zeros((self.cfg["policy"]["num_stack"] + 1, 2), dtype=np.float32)
         self.odom_pos = np.zeros(2, dtype=np.float32)
         self.base_yaw = 0
         self.stacked_obs_init = False
@@ -149,19 +151,23 @@ class OdomPolicy:
         self.stacked_odom_obs[-1, 6:19] = (dof_pos - self.default_dof_pos)[10:] * self.cfg["policy"]["normalization"]["dof_pos"]
         self.stacked_odom_obs[-1, 19:32] = dof_vel[10:] * self.cfg["policy"]["normalization"]["dof_vel"]
         acc = np.array(base_acc, dtype=np.float32)
-        print(f"projected_gravity: {projected_gravity}")
+        # print(f"projected_gravity: {projected_gravity}")
         local_gravity = projected_gravity * 9.81
-        print(f"local_gravity: {local_gravity}")
-        print(f"acc: {acc}")
+        # print(f"local_gravity: {local_gravity}")
+        # print(f"acc: {acc}")
         acc += local_gravity
-        print(f"acc: {acc}")
+        # print(f"acc: {acc}")
         self.stacked_odom_obs[-1, 32:35] = acc * 0.1
         self.stacked_yaw[:-1] = self.stacked_yaw[1:]
         self.stacked_yaw[-1] = base_yaw
+        if self.use_accel:
+            obs_input = torch.from_numpy(self.stacked_odom_obs).unsqueeze(0)
+        else:
+            obs_input = torch.from_numpy(self.stacked_odom_obs[:, :-3]).unsqueeze(0)
         local_odom = (
             self.odom_policy(
-                torch.from_numpy(self.stacked_odom_obs).unsqueeze(0),
-                torch.from_numpy(self.stacked_yaw - self.stacked_yaw[0]).unsqueeze(0),
+                obs_input,
+                torch.from_numpy(self.stacked_yaw - self.stacked_yaw[0])[1:].unsqueeze(0),
                 torch.from_numpy(
                     np.stack(
                         (
@@ -172,16 +178,21 @@ class OdomPolicy:
                         ),
                         axis=-1,
                     )
-                ).unsqueeze(0),
+                )[1:].unsqueeze(0),
             )
             .detach()
             .numpy()
         )
         # print(local_odom)
-        local_odom = local_odom[0]
-        self.odom_pos[0] = np.cos(self.stacked_yaw[0]) * local_odom[0] - np.sin(self.stacked_yaw[0]) * local_odom[1] + self.stacked_pos[-1, 0]
         
-        self.odom_pos[1] = np.sin(self.stacked_yaw[0]) * local_odom[0] + np.cos(self.stacked_yaw[0]) * local_odom[1] + self.stacked_pos[-1, 1]
+        local_odom = local_odom[0]
+        if self.delta_time == 0.02:
+            index = -1
+        else:
+            index = -51
+        self.odom_pos[0] = np.cos(self.stacked_yaw[0]) * local_odom[0] - np.sin(self.stacked_yaw[0]) * local_odom[1] + self.stacked_pos[index, 0]
+        
+        self.odom_pos[1] = np.sin(self.stacked_yaw[0]) * local_odom[0] + np.cos(self.stacked_yaw[0]) * local_odom[1] + self.stacked_pos[index, 1]
         
         self.stacked_pos[:-1, :] = self.stacked_pos[1:, :]
         self.stacked_pos[-1, :] = self.odom_pos

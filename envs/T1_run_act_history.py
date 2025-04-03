@@ -419,11 +419,11 @@ class T1RunActHistoryEnv(BasicEnv):
         else:
             self.cmd_change_time[need_update] += 200000
         
-        # 固定cmd
-        self.vel_cmd[:, 0] = 0.0
-        self.vel_cmd[:, 1] = 0.0
-        self.vel_cmd[:, 2] = 0.0
-        self.phase_rate[:] = -1
+        # # 固定cmd
+        # self.vel_cmd[:, 0] = 0.0
+        # self.vel_cmd[:, 1] = 0.0
+        # self.vel_cmd[:, 2] = 0.0
+        # self.phase_rate[:] = -1
 
         self.root_states[need_update, 7:9] += torch.randn(len_update, 2, device=self.device) * 0.3
         self.root_states[need_update, 10:] += torch.randn(len_update, 3, device=self.device) * 0.1

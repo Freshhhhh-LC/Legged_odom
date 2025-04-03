@@ -114,7 +114,7 @@ if __name__ == "__main__":
     # 准备批量数据
     window_size = 10
     mini_step = 10
-    x_train, y_train = prepare_data(data, window_size)
+    x_train, y_train = prepare_data(data, window_size) # x_train: [batch_size, seq_length, window_size], y_train: [batch_size, seq_length]
     # 过滤掉长度为 0 的张量
     x_train_filtered = [x for x in x_train if x.shape[0] > 0]
     y_train_filtered = [y for y in y_train if y.shape[0] > 0]
@@ -122,6 +122,7 @@ if __name__ == "__main__":
     y_train = y_train_filtered
     x_train = pad_sequence(x_train, batch_first=True)
     y_train = pad_sequence(y_train, batch_first=True)
+    print(x_train.shape, y_train.shape)
     dataset = TensorDataset(x_train, y_train)
     dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 

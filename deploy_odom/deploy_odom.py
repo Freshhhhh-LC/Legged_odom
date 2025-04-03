@@ -3,6 +3,8 @@ import time
 import yaml
 import logging
 import threading
+import os  # 添加导入 os 模块
+
 # import rclpy
 # import rerun as rr
 
@@ -35,7 +37,7 @@ class OdomController:
 
         # Initialize components
         # self.remoteControlService = RemoteControlService()
-        self.policy = OdomPolicy(cfg=self.cfg)
+        self.policy = OdomPolicy(cfg=self.cfg, delta_time=0.02, use_accel=True)
 
         self._init_timer()
         self._init_low_state_values()
@@ -43,6 +45,11 @@ class OdomController:
         self.running = True
 
         self.publish_lock = threading.Lock()
+
+        self.output_file = "traj/1/odom_traj.txt"
+        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+        with open(self.output_file, "w") as f:
+            f.write("# timestamp x y z qx qy qz qw\n")  # 写入文件头
 
     def _init_timer(self):
         self.timer = Timer(TimerConfig(time_step=self.cfg["common"]["dt"]))
@@ -128,6 +135,11 @@ class OdomController:
         
         print(f"Odom: {self.odom_pos}")
         
+        # 写入文件
+        timestamp = time.time()
+        x, y = self.odom_pos
+        with open(self.output_file, "a") as f:
+            f.write(f"{timestamp} {x} {y} 0 0 0 0 1\n")  # TUM 格式
         
         inference_time = time.perf_counter()
         self.logger.debug(f"Inference took {(inference_time - start_time)*1000:.4f} ms")

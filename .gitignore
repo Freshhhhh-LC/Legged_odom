@@ -1,4 +1,6 @@
 logs/
 data/
+data_*/
+output/
 nohup.out
 __pycache__

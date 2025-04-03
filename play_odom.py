@@ -130,21 +130,21 @@ if __name__ == "__main__":
         start_mask = infos["start_mask"].to(env.device)
         odom = infos["odom"].to(env.device)
 
-        tmp_pos = torch.stack(odom_pred_wys_pos_list[-50:], dim=1) # 世界坐标系下的x_{i-49} ~ x_i（预测的）
+        tmp_pos = torch.stack(odom_pred_wys_pos_list[-51:], dim=1) # 世界坐标系下的x_{i-50} ~ x_i（预测的）
 
         pos_input = torch.stack(
             (
-                torch.cos(abs_yaw_history[:, 0].unsqueeze(1)) * (tmp_pos[:, :, 0] - tmp_pos[:, 0, 0].unsqueeze(1)) + torch.sin(abs_yaw_history[:, 0].unsqueeze(1)) * (tmp_pos[:, :, 1] - tmp_pos[:, 0, 1].unsqueeze(1)),
-                -torch.sin(abs_yaw_history[:, 0].unsqueeze(1)) * (tmp_pos[:, :, 0] - tmp_pos[:, 0, 0].unsqueeze(1)) + torch.cos(abs_yaw_history[:, 0].unsqueeze(1)) * (tmp_pos[:, :, 1] - tmp_pos[:, 0, 1].unsqueeze(1))
+                torch.cos(abs_yaw_history[:, 1].unsqueeze(1)) * (tmp_pos[:, :, 0] - tmp_pos[:, 0, 0].unsqueeze(1)) + torch.sin(abs_yaw_history[:, 1].unsqueeze(1)) * (tmp_pos[:, :, 1] - tmp_pos[:, 0, 1].unsqueeze(1)),
+                -torch.sin(abs_yaw_history[:, 1].unsqueeze(1)) * (tmp_pos[:, :, 0] - tmp_pos[:, 0, 0].unsqueeze(1)) + torch.cos(abs_yaw_history[:, 1].unsqueeze(1)) * (tmp_pos[:, :, 1] - tmp_pos[:, 0, 1].unsqueeze(1))
             ),
             dim=-1
         ) # 输入的坐标要转为机器人初始坐标系下的坐标
-        odom_pred_wys = odom_model_wys(odom_obs_history_wys, yaw_history, pos_input)
+        odom_pred_wys = odom_model_wys(odom_obs_history_wys[:, 1:], yaw_history[:, 2:], pos_input[:, 1:])
         
         odom_pred_wys_pos = torch.stack(
             (
-                torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] - torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 0],
-                torch.sin(abs_yaw_history[:, 0]) * odom_pred_wys[:, 0] + torch.cos(abs_yaw_history[:, 0]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 1]
+                torch.cos(abs_yaw_history[:, 1]) * odom_pred_wys[:, 0] - torch.sin(abs_yaw_history[:, 1]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 0],
+                torch.sin(abs_yaw_history[:, 1]) * odom_pred_wys[:, 0] + torch.cos(abs_yaw_history[:, 1]) * odom_pred_wys[:, 1] + odom_pred_wys_pos_list[-1][:, 1]
             ),
             dim=-1
         ) # x_i+1
@@ -155,8 +155,8 @@ if __name__ == "__main__":
         # odom_pred_pos = odom_pred[i, :, :2] + odom_pred_pos_list[-1][:, :2] # x_i = d_i + x_i-1 
         odom_pred_Legolas_pos = torch.stack(
             (
-                torch.cos(abs_yaw_history[:, 0]) * odom_pred_Legolas[:, 0] - torch.sin(abs_yaw_history[:, 0]) * odom_pred_Legolas[:, 1] + odom_pred_Legolas_pos_list[-1][:, 0],
-                torch.sin(abs_yaw_history[:, 0]) * odom_pred_Legolas[:, 0] + torch.cos(abs_yaw_history[:, 0]) * odom_pred_Legolas[:, 1] + odom_pred_Legolas_pos_list[-1][:, 1]
+                torch.cos(abs_yaw_history[:, 1]) * odom_pred_Legolas[:, 0] - torch.sin(abs_yaw_history[:, 1]) * odom_pred_Legolas[:, 1] + odom_pred_Legolas_pos_list[-1][:, 0],
+                torch.sin(abs_yaw_history[:, 1]) * odom_pred_Legolas[:, 0] + torch.cos(abs_yaw_history[:, 1]) * odom_pred_Legolas[:, 1] + odom_pred_Legolas_pos_list[-1][:, 1]
             ),
             dim=-1
         ) # x_i = d_i + x_i-1 [num_envs, 2]

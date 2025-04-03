@@ -12,14 +12,14 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             self.obs_stacking = obs_stacking
             self.obs_history = torch.zeros(self.num_envs, self.obs_stacking, self.num_obs, device=self.device)
 
-            self.odom_obs_history_wys = torch.zeros(self.num_envs, self.obs_stacking, 35, device=self.device)
+            self.odom_obs_history_wys = torch.zeros(self.num_envs, self.obs_stacking + 1, 35, device=self.device)
 
             self.odom_obs_history_Legolas = torch.zeros(self.num_envs, self.obs_stacking, 46, device=self.device)
 
             self.odom_obs_history_baseline = torch.zeros(self.num_envs, self.obs_stacking, 45, device=self.device)
 
-            self.yaw_history = torch.zeros(self.num_envs, self.obs_stacking, device=self.device)
-            self.pos_history = torch.zeros(self.num_envs, self.obs_stacking + 1, 2, device=self.device)
+            self.yaw_history = torch.zeros(self.num_envs, self.obs_stacking + 2, device=self.device)
+            self.pos_history = torch.zeros(self.num_envs, self.obs_stacking + 2, 2, device=self.device)
             self.start_mask = torch.zeros(self.num_envs, self.obs_stacking, device=self.device)
             self.origin_pos = torch.zeros(self.num_envs, 2, device=self.device)
             self.origin_yaw = torch.zeros(self.num_envs, device=self.device)
@@ -75,7 +75,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             self.odom_obs_history_wys[:, -1, 0:6] = obs[:, 0:6]
             self.odom_obs_history_wys[:, -1, 6:32] = obs[:, 13:39]
             acc = self.root_acc[:, 0:3]
-            local_acc = quat_rotate_inverse(self.root_states[:, 3:7], acc) * 0.1 + torch.randn_like(acc) * 0.01
+            local_acc = quat_rotate_inverse(self.root_states[:, 3:7], acc) * 0.1 + torch.randn_like(acc) * 0.1
             self.odom_obs_history_wys[done, :, 32:35] = local_acc[done].unsqueeze(1)
             self.odom_obs_history_wys[:, -1, 32:35] = local_acc
             
@@ -113,7 +113,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
                     "odom_obs_history_wys": self.odom_obs_history_wys,
                     "odom_obs_history_Legolas": self.odom_obs_history_Legolas,
                     "odom_obs_history_baseline": self.odom_obs_history_baseline,
-                    "yaw_history": (self.yaw_history - self.yaw_history[:, 0].unsqueeze(1)) * (1 - done.float()).unsqueeze(-1),
+                    "yaw_history": (self.yaw_history - self.yaw_history[:, 1].unsqueeze(1)) * (1 - done.float()).unsqueeze(-1),
                     "pos_history": torch.stack(
                         (
                             torch.cos(self.yaw_history[:, 0].unsqueeze(1)) * (self.pos_history[:, :, 0] - self.pos_history[:, 0, 0].unsqueeze(1))

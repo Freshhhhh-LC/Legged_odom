@@ -1,8 +1,8 @@
 import torch
 
 # 加载模型路径
-model_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-03-25-22-31-37/model_wys_800.pt"  # 替换为你的模型路径
-output_path = "/home/luochangsheng/odom/Legged_odom/models/model_wys_cpu_withoutacc.pt"  # 转换后的模型保存路径
+model_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-03-29-20-51-42/model_epoch_70_file.pt"  # 替换为你的模型路径
+output_path = "/home/luochangsheng/odom/Legged_odom/deploy_odom/models/model_wys.pt"  # 转换后的模型保存路径
 
 def convert_model_to_cpu(model_path, output_path):
     # 加载模型
