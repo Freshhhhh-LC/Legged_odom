@@ -3,7 +3,6 @@ import time
 import yaml
 import logging
 import threading
-import rclpy
 
 from booster_robotics_sdk_python import (
     ChannelFactory,
@@ -18,7 +17,6 @@ from booster_robotics_sdk_python import (
 
 from utils.command import create_prepare_cmd, create_first_frame_rl_cmd
 from utils.remote_control_service import RemoteControlService
-from utils.ros_node import RosSubscriber
 from utils.rotate import rotate_vector_inverse_rpy
 from utils.timer import TimerConfig, Timer
 from utils.policy import Policy
@@ -34,29 +32,9 @@ class Controller:
         with open(cfg_file, "r", encoding="utf-8") as f:
             self.cfg = yaml.load(f.read(), Loader=yaml.FullLoader)
 
-        rr.init("deploy", spawn=True)
-        rr.connect_tcp(f"{self.cfg['common']['rerun_ip']}:9876")
-        map_lines = []
-        map_lines.append([[-7, -4.5], [-7, 4.5], [7, 4.5], [7, -4.5], [-7, -4.5]])
-        map_lines.append([[0, -4.5], [0, 4.5]])
-        map_lines.append([[1.5 * np.cos(theta), 1.5 * np.sin(theta)] for theta in np.arange(0, 2 * np.pi + 0.1, 0.1)])
-        map_lines.append([[4.7, 0.0], [5.1, 0.0]])
-        map_lines.append([[4.9, -0.2], [4.9, 0.2]])
-        map_lines.append([[-5.1, 0.0], [-4.7, 0.0]])
-        map_lines.append([[-4.9, -0.2], [-4.9, 0.2]])
-        map_lines.append([[7, 1.3], [8, 1.3], [8, -1.3], [7, -1.3]])
-        map_lines.append([[-7, 1.3], [-8, 1.3], [-8, -1.3], [-7, -1.3]])
-        map_lines.append([[7, 3], [4, 3], [4, -3], [7, -3]])
-        map_lines.append([[-7, 3], [-4, 3], [-4, -3], [-7, -3]])
-        map_lines.append([[7, 2], [6, 2], [6, -2], [7, -2]])
-        map_lines.append([[-7, 2], [-6, 2], [-6, -2], [-7, -2]])
-        rr.log("field/Border", rr.LineStrips2D(map_lines, colors=[255, 255, 255]), static=True)
-
         # Initialize components
         self.remoteControlService = RemoteControlService()
         self.policy = Policy(cfg=self.cfg)
-        rclpy.init()
-        self.ros_node = RosSubscriber(self.policy)
 
         self._init_timer()
         self._init_low_state_values()
@@ -132,7 +110,6 @@ class Controller:
             self.low_state_subscriber.CloseChannel()
         if hasattr(self, "publish_runner") and getattr(self, "publish_runner") != None:
             self.publish_runner.join(timeout=1.0)
-        self.ros_node.destroy_node()
 
     def start_custom_mode_conditionally(self):
         print(f"{self.remoteControlService.get_custom_mode_operation_hint()}")
@@ -184,15 +161,10 @@ class Controller:
             base_ang_vel=self.base_ang_vel,
             projected_gravity=self.projected_gravity,
             base_yaw=self.base_yaw,
-            ball_pos=self.ros_node.ball_pos,
+            vx=self.remoteControlService.get_vx_cmd(),
+            vy=self.remoteControlService.get_vy_cmd(),
+            vyaw=self.remoteControlService.get_vyaw_cmd(),
         )
-        rr.log("x/Robot", rr.Scalar(self.policy.odom_pos[0]))
-        rr.log("x/Ball", rr.Scalar(self.ros_node.ball_pos[0]))
-        rr.log("y/Robot", rr.Scalar(self.policy.odom_pos[1]))
-        rr.log("y/Ball", rr.Scalar(self.ros_node.ball_pos[1]))
-        rr.log("yaw/Robot", rr.Scalar(self.base_yaw))
-        rr.log("field/Robot", rr.Points2D((self.policy.odom_pos[0], self.policy.odom_pos[1]), radii=0.15, colors=[255, 255, 0]))
-        rr.log("field/Ball", rr.Points2D((self.ros_node.ball_pos[0], self.ros_node.ball_pos[1]), radii=0.1, colors=[255, 0, 0]))
 
         inference_time = time.perf_counter()
         self.logger.debug(f"Inference took {(inference_time - start_time)*1000:.4f} ms")
@@ -220,6 +192,7 @@ class Controller:
                     -self.cfg["common"]["torque_limit"][i],
                     self.cfg["common"]["torque_limit"][i],
                 )
+                self.low_cmd.motor_cmd[i].kp = 0.0
 
             start_time = time.perf_counter()
             self._send_cmd(self.low_cmd)

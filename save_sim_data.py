@@ -66,6 +66,7 @@ if __name__ == "__main__":
             act_std = dist.scale
             act = act_mean + act_std * torch.randn_like(act_std)
         obs, rew, done, infos = env.step(act)
+        obs_history = infos["obs_history"].to(env.device)
         times = torch.zeros(env.num_envs, device=env.device).cpu().numpy()
         _, _, yaw = get_euler_xyz(env.root_states[:, 3:7])
         yaw = yaw.cpu().numpy()

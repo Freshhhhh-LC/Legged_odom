@@ -6,16 +6,16 @@ common:
     20, 20, 20, 20,
     20, 20, 20, 20,
     200,
-    200, 200, 200, 200, 50, 50,
-    200, 200, 200, 200, 50, 50
+    200, 200, 200, 200, 100, 100,
+    200, 200, 200, 200, 100, 100
   ]
   damping: [
     1, 1,
     0.5, 0.5, 0.5, 0.5,
     0.5, 0.5, 0.5, 0.5,
-    5,
-    5, 5, 5, 5, 3, 3,
-    5, 5, 5, 5, 3, 3
+    2,
+    2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2
   ]
   default_qpos: [
     0, 0,
@@ -26,20 +26,22 @@ common:
     -0.2, 0, 0, 0.4, -0.25, 0
   ]
   torque_limit: [
-    7, 7,
-    10, 10, 10, 10,
-    10, 10, 10, 10,
-    30,
-    60, 25, 30, 60, 24, 15,
-    60, 25, 30, 60, 24, 15
+    7., 7.,
+    10., 10., 10., 10.,
+    10., 10., 10., 10.,
+    30.,
+    60., 25., 30., 60., 24., 6.,
+    60., 25., 30., 60., 24., 6.
   ]
 
 policy:
-  policy_path: "./models/T1.pt"
-  odom_policy_path: "/home/master/Workspace/deploy_odom/model_wys.pt"
-  num_actions: 13
-  num_observations: 57
+  policy_path: "/home/wys/lcs/Legged_odom/deploy_odom/models/T1_run.pth"
+  odom_policy_path: "/home/wys/lcs/Legged_odom/deploy_odom/models/model_wys_560_sim_0.02s_acc.pt"
+  num_actions: 11
+  num_observations: 83
   num_odom_obs: 35
+  delta_time: 0.02
+  use_accel: true
   num_stack: 50
   gait_frequency: 2
 

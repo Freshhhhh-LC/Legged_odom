@@ -1,4 +1,5 @@
 import torch
+from utils.model import DenoisingRMA
 
 # 加载模型路径
 model_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-03-29-20-51-42/model_epoch_70_file.pt"  # 替换为你的模型路径

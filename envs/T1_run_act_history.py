@@ -112,9 +112,9 @@ class T1RunActHistoryEnv(BasicEnv):
         self.need_change_cmd = change_cmd
         self.num_zero_vel_envs = int(self.num_envs * 0.25)
         if self.need_change_cmd:
-            self.ep_len_max = 1500
+            self.ep_len_max = 15000 # 30s
         else:
-            self.ep_len_max = 500  # 10 s
+            self.ep_len_max = 5000  # 100 s
 
         # action:
         # jpos_inc : self.num_dof - 2, no ankle roll
@@ -415,7 +415,7 @@ class T1RunActHistoryEnv(BasicEnv):
             self.phase_rate[stop_mask] = -1
 
         if self.need_change_cmd:
-            self.cmd_change_time[need_update] += 400 + torch.randint(200, (len_update,), device=self.device)
+            self.cmd_change_time[need_update] += 25 + torch.randint(20, (len_update,), device=self.device)
         else:
             self.cmd_change_time[need_update] += 200000
         
