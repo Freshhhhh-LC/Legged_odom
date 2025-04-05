@@ -415,7 +415,7 @@ class T1RunActHistoryEnv(BasicEnv):
             self.phase_rate[stop_mask] = -1
 
         if self.need_change_cmd:
-            self.cmd_change_time[need_update] += 25 + torch.randint(20, (len_update,), device=self.device)
+            self.cmd_change_time[need_update] += 400 + torch.randint(200, (len_update,), device=self.device)
         else:
             self.cmd_change_time[need_update] += 200000
         

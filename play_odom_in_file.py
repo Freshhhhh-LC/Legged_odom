@@ -55,7 +55,7 @@ if __name__ == "__main__":
     USE_ACC = True
     USE_POS_SEQ = True
     
-    odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-02-10-45-25_0.02s_acc/model_wys_2000.pt"
+    odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-04-20-35-18_sim_file_0.02s_acc/model_wys_66_sim_file_0.02s_acc.pt"
     # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-02-12-09-59_0.02s_acc_no_pos_seq/model_wys_2000.pt"
     
     NAME = ""
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     
     
     # data_dir = "/home/luochangsheng/odom/Legged_odom/data_mixed/segment_length=450"
-    data_dir = "/home/luochangsheng/odom/Legged_odom/data_sim/segments"
+    data_dir = "/home/luochangsheng/odom/Legged_odom/data/segment_length=1800"
     csv_file_paths = []
     num = 20
     # 随机抽取10个csv文件
@@ -220,25 +220,25 @@ if __name__ == "__main__":
     aligned_pred_pos = torch.tensor(aligned_pred_pos, device=env.device)
 
     # Recalculate metrics
-    ape = torch.sqrt(torch.mean(torch.norm(aligned_pred_pos - gt_pos, dim=-1) ** 2, dim=-1))  # 计算APE: 方均根
+    ATE_u = torch.sqrt(torch.mean(torch.norm(aligned_pred_pos - gt_pos, dim=-1) ** 2, dim=-1))  # 计算ATE_o: 方均根
+    ATE_o = torch.sqrt(torch.mean(torch.norm(pred_pos - gt_pos, dim=-1) ** 2, dim=-1))  # 计算ATE_u: 方均根
     rpe = torch.sqrt(torch.mean(torch.norm(
         aligned_pred_pos[:, 1:] - aligned_pred_pos[:, :-1] - (gt_pos[:, 1:] - gt_pos[:, :-1]), dim=-1) ** 2, dim=-1))  # 计算RPE
-    ate = torch.norm(aligned_pred_pos - gt_pos, dim=-1).sum(dim=-1)  # 计算ATE
     pred_traj_length = torch.norm(aligned_pred_pos[:, 1:] - aligned_pred_pos[:, :-1], dim=-1).sum(dim=-1)  # 预测轨迹长度
     gt_traj_length = torch.norm(gt_pos[:, 1:] - gt_pos[:, :-1], dim=-1).sum(dim=-1)  # 真实轨迹长度
     duration = num_steps * DELTA_TIME  # 持续时间
 
-    avg_ape = ape.mean().item()
+    avg_ATE_o = ATE_o.mean().item()
+    avg_ATE_u = ATE_u.mean().item()
     avg_rpe = rpe.mean().item()
-    avg_ate = ate.mean().item()
     avg_pred_traj_length = pred_traj_length.mean().item()
     avg_gt_traj_length = gt_traj_length.mean().item()
 
     # for i in range(num_envs):
     #     print(f"Environment {i}:")
-    #     print(f"  APE: {ape[i].item():.4f}")
+    #     print(f"  ATE_o: {ATE_o[i].item():.4f}")
+    #     print(f"  ATE_u: {ATE_u[i].item():.4f}")
     #     print(f"  RPE: {rpe[i].item():.4f}")
-    #     print(f"  ATE: {ate[i].item():.4f}")
     #     print(f"  Predicted Trajectory Length: {pred_traj_length[i].item():.4f}")
     #     print(f"  Ground Truth Trajectory Length: {gt_traj_length[i].item():.4f}")
     #     print(f"  Duration: {duration:.2f} seconds")
@@ -257,9 +257,9 @@ if __name__ == "__main__":
 
         # 添加指标信息
         metrics_text = (
-            f"APE: {ape[i].item():.4f}\n"
+            f"ATE_o: {ATE_o[i].item():.4f}\n"
+            f"ATE_u: {ATE_u[i].item():.4f}\n"
             f"RPE: {rpe[i].item():.4f}\n"
-            f"ATE: {ate[i].item():.4f}\n"
             f"Predicted Length: {pred_traj_length[i].item():.4f}\n"
             f"Ground Truth Length: {gt_traj_length[i].item():.4f}"
         )
@@ -269,8 +269,8 @@ if __name__ == "__main__":
         plt.close()
 
     print("Average Metrics:")
-    print(f"  Average APE: {avg_ape:.4f}")
+    print(f"  Average ATE_o: {avg_ATE_o:.4f}")
+    print(f"  Average ATE_u: {avg_ATE_u:.4f}")
     print(f"  Average RPE: {avg_rpe:.4f}")
-    print(f"  Average ATE: {avg_ate:.4f}")
     print(f"  Average Predicted Trajectory Length: {avg_pred_traj_length:.4f}")
     print(f"  Average Ground Truth Trajectory Length: {avg_gt_traj_length:.4f}")
