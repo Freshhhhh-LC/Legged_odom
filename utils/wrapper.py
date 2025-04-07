@@ -12,7 +12,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             self.obs_stacking = obs_stacking
             self.obs_history = torch.zeros(self.num_envs, self.obs_stacking, self.num_obs, device=self.device)
 
-            self.odom_obs_history_wys = torch.zeros(self.num_envs, self.obs_stacking + 1, 35, device=self.device)
+            self.odom_obs_history_wys = torch.zeros(self.num_envs, self.obs_stacking + 1, 46, device=self.device)
 
             self.odom_obs_history_Legolas = torch.zeros(self.num_envs, self.obs_stacking, 46, device=self.device)
 
@@ -33,6 +33,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             acc = self.root_acc[:, 0:3]
             local_acc = quat_rotate_inverse(self.root_states[:, 3:7], acc) * 0.1 + torch.randn_like(acc) * 0.01
             self.odom_obs_history_wys[:, :, 32:35] = local_acc.unsqueeze(1) # local acc
+            self.odom_obs_history_wys[:, :, 35:46] = obs[:, 39:50].unsqueeze(1)
 
 
             self.odom_obs_history_Legolas[:, :, 0:9] = obs[:, 0:9].unsqueeze(1)
@@ -78,6 +79,7 @@ def ObsStackingEnvWrapperForOdom(base_env, obs_stacking, *args, **kwargs):
             local_acc = quat_rotate_inverse(self.root_states[:, 3:7], acc) * 0.1 + torch.randn_like(acc) * 0.1
             self.odom_obs_history_wys[done, :, 32:35] = local_acc[done].unsqueeze(1)
             self.odom_obs_history_wys[:, -1, 32:35] = local_acc
+            self.odom_obs_history_wys[done, :, 35:46] = obs[done, 39:50].unsqueeze(1)
             
 
             self.odom_obs_history_Legolas[:] = torch.roll(self.odom_obs_history_Legolas, -1, dims=1)

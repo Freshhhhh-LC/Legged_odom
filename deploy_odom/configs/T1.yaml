@@ -39,9 +39,11 @@ policy:
   odom_policy_path: "/home/wys/lcs/Legged_odom/deploy_odom/models/model_wys_560_sim_0.02s_acc.pt"
   num_actions: 11
   num_observations: 83
-  num_odom_obs: 35
+  num_odom_obs: 32
   delta_time: 0.02
   use_accel: true
+  use_pos_seq: true
+  use_actions: true
   num_stack: 50
   gait_frequency: 2
 

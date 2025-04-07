@@ -179,6 +179,15 @@ class Controller:
             base_acc=self.base_acc,
         )
         
+        actions = self.policy.actions
+
+        # 保存 actions 到 CSV 文件
+        timestamp = time.time()
+        actions_csv_line = f"{timestamp}," + ",".join(map(str, actions)) + "\n"
+        output_csv_file = "actions_log.csv"
+        with open(output_csv_file, "a") as f:
+            f.write(actions_csv_line)
+        
         # print(f"Odom: {self.odom_pos}")
         
         # # 写入文件

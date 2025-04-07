@@ -17,7 +17,7 @@ from isaacgym.torch_utils import *
 if __name__ == "__main__":
     data_dir = os.path.join("data_sim", "segments")
     data_length = 3600
-    num_envs = 512
+    num_envs = 4096
     os.makedirs(data_dir, exist_ok=True)  # 创建 data 文件夹
     env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, num_envs, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
@@ -28,18 +28,6 @@ if __name__ == "__main__":
     state_dict = torch.load("models/T1_run.pth", weights_only=True)
     model.load_state_dict(state_dict["model"])
     recorder = SummaryWriter(dir)
-
-    buf = Dataset(24, env.num_envs)
-    buf.AddBuffer("obs_history", (env.obs_stacking, env.num_obs), device=env.device)
-    buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking + 1, 35), device=env.device)
-    buf.AddBuffer("odom_obs_history_Legolas", (env.obs_stacking, 46), device=env.device)
-    buf.AddBuffer("odom_obs_history_baseline", (env.obs_stacking, 45), device=env.device)
-    buf.AddBuffer("yaw_history", (env.obs_stacking + 2,), device=env.device)
-    buf.AddBuffer("pos_history", (env.obs_stacking + 2, 2), device=env.device)
-    buf.AddBuffer("pred_pos_history", (env.obs_stacking + 3, 2), device=env.device)
-    buf.AddBuffer("abs_yaw_history", (env.obs_stacking + 2,), device=env.device)
-    buf.AddBuffer("start_mask", (env.obs_stacking,), device=env.device)
-    buf.AddBuffer("odom", (2,), device=env.device)
 
     obs, infos = env.reset()
     obs_history = infos["obs_history"].to(env.device)
@@ -83,6 +71,8 @@ if __name__ == "__main__":
         mocap_timestamp = torch.zeros(env.num_envs, device=env.device).cpu().numpy()
         robot_pos = env.root_states[:, 0:2].cpu().numpy()
         ball_pos = torch.zeros(env.num_envs, 2, device=env.device).cpu().numpy()
+        actions = torch.zeros(env.num_envs, 11, device=env.device).cpu().numpy()
+        actions = act.clone()
 
         for k in range(env.num_envs):
             
@@ -99,7 +89,9 @@ if __name__ == "__main__":
                         "q_13", "q_14", "q_15", "q_16", "q_17", "q_18", "q_19", "q_20", "q_21", "q_22",
                         "dq_0", "dq_1", "dq_2", "dq_3", "dq_4", "dq_5", "dq_6", "dq_7", "dq_8", "dq_9", "dq_10", "dq_11",
                         "dq_12", "dq_13", "dq_14", "dq_15", "dq_16", "dq_17", "dq_18", "dq_19", "dq_20", "dq_21", "dq_22",
-                        "mocap_time", "mocap_timestamp", "robot_x", "robot_y", "robot_yaw", "ball_x", "ball_y"
+                        "mocap_time", "mocap_timestamp", "robot_x", "robot_y", "robot_yaw", "ball_x", "ball_y",
+                        "actions_0", "actions_1", "actions_2", "actions_3", "actions_4", "actions_5",
+                        "actions_6", "actions_7", "actions_8", "actions_9", "actions_10"
                     ])
 
             # 写入数据到对应环境的文件
@@ -121,5 +113,9 @@ if __name__ == "__main__":
                     dq[k, 20].item(), dq[k, 21].item(), dq[k, 22].item(),
                     mocap_time[k].item(), mocap_timestamp[k].item(),
                     robot_pos[k, 0].item(), robot_pos[k, 1].item(), yaw[k].item(),
-                    ball_pos[k, 0].item(), ball_pos[k, 1].item()
+                    ball_pos[k, 0].item(), ball_pos[k, 1].item(),
+                    actions[k, 0].item(), actions[k, 1].item(), actions[k, 2].item(),
+                    actions[k, 3].item(), actions[k, 4].item(), actions[k, 5].item(),
+                    actions[k, 6].item(), actions[k, 7].item(), actions[k, 8].item(),
+                    actions[k, 9].item(), actions[k, 10].item()
                 ])

@@ -15,6 +15,7 @@ if __name__ == "__main__":
     DELTA_TIME = 0.02
     USE_ACC = True
     USE_POS_SEQ = True
+    USE_ACTIONS = True
     NAME = ""
     if DELTA_TIME == 0.02:
         NAME += "_0.02s"
@@ -24,16 +25,22 @@ if __name__ == "__main__":
         NAME += "_acc"
     if not USE_POS_SEQ:
         NAME += "_no_pos_seq"
+    if USE_ACTIONS:
+        NAME += "_actions"
+        
+    num_obs_wys = 32
+    if USE_ACC:
+        num_obs_wys += 3
+    if USE_ACTIONS:
+        num_obs_wys += 11
+    
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + NAME)
     os.makedirs(dir, exist_ok=True)
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 4096, "cuda:3", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
-    if USE_ACC:
-        num_obs = 35
-    else:
-        num_obs = 32
-    odom_model_wys = OdomEstimator_wys(num_obs + 4, env.obs_stacking).to(env.device)
+    
+    odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
 
     odom_model_Legolas = OdomEstimator_Legolas(46 + 2, env.obs_stacking).to(env.device)
@@ -48,7 +55,7 @@ if __name__ == "__main__":
 
     buf = Dataset(24, env.num_envs)
     buf.AddBuffer("obs_history", (env.obs_stacking, env.num_obs), device=env.device)
-    buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking + 1, num_obs), device=env.device)
+    buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking + 1, num_obs_wys), device=env.device)
     buf.AddBuffer("odom_obs_history_Legolas", (env.obs_stacking, 46), device=env.device)
     buf.AddBuffer("odom_obs_history_baseline", (env.obs_stacking, 45), device=env.device)
     buf.AddBuffer("yaw_history", (env.obs_stacking + 2,), device=env.device)
@@ -74,10 +81,14 @@ if __name__ == "__main__":
 
     obs, infos = env.reset()
     obs_history = infos["obs_history"].to(env.device)
-    if USE_ACC:
+    if USE_ACC and USE_ACTIONS:
         odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
+    elif USE_ACC and not USE_ACTIONS:
+        odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-11].to(env.device)
+    elif not USE_ACC and USE_ACTIONS:
+        odom_obs_history_wys = torch.cat((infos["odom_obs_history_wys"][..., :-14], infos["odom_obs_history_wys"][..., -11:]), dim=-1).to(env.device)
     else:
-        odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-3].to(env.device)
+        odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-14].to(env.device)
     odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(env.device)
     odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(env.device)
     yaw_history = infos["yaw_history"].to(env.device)
@@ -111,10 +122,14 @@ if __name__ == "__main__":
                 
             obs, rew, done, infos = env.step(act)
             obs_history = infos["obs_history"].to(env.device)
-            if USE_ACC:
+            if USE_ACC and USE_ACTIONS:
                 odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
+            elif USE_ACC and not USE_ACTIONS:
+                odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-11].to(env.device)
+            elif not USE_ACC and USE_ACTIONS:
+                odom_obs_history_wys = torch.cat((infos["odom_obs_history_wys"][..., :-14], infos["odom_obs_history_wys"][..., -11:]), dim=-1).to(env.device)
             else:
-                odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-3].to(env.device)
+                odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-14].to(env.device)
             odom_obs_history_Legolas = infos["odom_obs_history_Legolas"].to(env.device)
             odom_obs_history_baseline = infos["odom_obs_history_baseline"].to(env.device)
             yaw_history = infos["yaw_history"].to(env.device)

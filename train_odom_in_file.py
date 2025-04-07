@@ -11,13 +11,26 @@ from utils.dataset import Dataset
 if __name__ == "__main__":
     DELTA_TIME = 0.02
     USE_ACC = True
-    NAME = "_mixed_file"
+    USE_POS_SEQ = True
+    USE_ACTIONS = True
+    NAME = "_file"
     if DELTA_TIME == 0.02:
         NAME += "_0.02s"
     else:
         NAME += "_1.02s"
     if USE_ACC:
         NAME += "_acc"
+    if not USE_POS_SEQ:
+        NAME += "_no_pos_seq"
+    if USE_ACTIONS:
+        NAME += "_actions"
+        
+    num_obs_wys = 32
+    if USE_ACC:
+        num_obs_wys += 3
+    if USE_ACTIONS:
+        num_obs_wys += 11
+        
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + NAME)
     os.makedirs(dir, exist_ok=True)
     
@@ -33,18 +46,14 @@ if __name__ == "__main__":
     env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:3")
     num_steps = env.num_rows[0]
     
-    if USE_ACC:
-        num_obs = 35
-    else:
-        num_obs = 32
-    odom_model_wys = OdomEstimator_wys(num_obs + 4, env.obs_stacking).to(env.device)
+    odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
 
     state_dict = torch.load("models/T1_run.pth", weights_only=True)
     recorder = SummaryWriter(dir)
 
     buf = Dataset(24, env.num_envs)
-    buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking + 1, num_obs), device=env.device)
+    buf.AddBuffer("odom_obs_history_wys", (env.obs_stacking + 1, num_obs_wys), device=env.device)
     buf.AddBuffer("yaw_history", (env.obs_stacking + 2,), device=env.device)
     buf.AddBuffer("pos_history", (env.obs_stacking + 2, 2), device=env.device)
     buf.AddBuffer("pred_pos_history", (env.obs_stacking + 3, 2), device=env.device)
@@ -53,10 +62,14 @@ if __name__ == "__main__":
     for epoch in range(100):
         env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:3")
         infos = env.reset()
-        if USE_ACC:
+        if USE_ACC and USE_ACTIONS:
             odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
+        elif USE_ACC and not USE_ACTIONS:
+            odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-11].to(env.device)
+        elif not USE_ACC and USE_ACTIONS:
+            odom_obs_history_wys = torch.cat((infos["odom_obs_history_wys"][..., :-14], infos["odom_obs_history_wys"][..., -11:]), dim=-1).to(env.device)
         else:
-            odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-3].to(env.device)
+            odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-14].to(env.device)
         yaw_history = infos["yaw_history"].to(env.device)
         pos_history = infos["pos_history"].to(env.device)
         abs_yaw_history = infos["abs_yaw_history"].to(env.device)
@@ -77,10 +90,14 @@ if __name__ == "__main__":
                 infos, done = env.step()
                 if done:
                     break
-                if USE_ACC:
+                if USE_ACC and USE_ACTIONS:
                     odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
+                elif USE_ACC and not USE_ACTIONS:
+                    odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-11].to(env.device)
+                elif not USE_ACC and USE_ACTIONS:
+                    odom_obs_history_wys = torch.cat((infos["odom_obs_history_wys"][..., :-14], infos["odom_obs_history_wys"][..., -11:]), dim=-1).to(env.device)
                 else:
-                    odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-3].to(env.device)
+                    odom_obs_history_wys = infos["odom_obs_history_wys"][..., :-14].to(env.device)
                 yaw_history = infos["yaw_history"].to(env.device)
                 pos_history = infos["pos_history"].to(env.device)
                 abs_yaw_history = infos["abs_yaw_history"].to(env.device) # env_nums, stack_nums(yaw_i)

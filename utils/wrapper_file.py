@@ -21,11 +21,12 @@ class OdomStackingDataEnvFromFile:
         # 59:61 "robot_x", "robot_y"
         # 61:62 "robot_yaw"
         # 62:64 "ball_x", "ball_y"
+        # 64:75 ["actions_" + str(i) for i in range(11)]
         
         self.rows = [next(reader) for reader in self.data_readers]
         self.next_rows = [next(reader) for reader in self.data_readers]
         
-        self.odom_obs_history_wys = torch.zeros(self.num_envs, self.obs_stacking + 1, 35, device=device)
+        self.odom_obs_history_wys = torch.zeros(self.num_envs, self.obs_stacking + 1, 46, device=device)
         self.yaw_history = torch.zeros(self.num_envs, self.obs_stacking + 2, device=device)
         self.pos_history = torch.zeros(self.num_envs, self.obs_stacking + 2, 2, device=device)
         self.device = device
@@ -80,8 +81,12 @@ class OdomStackingDataEnvFromFile:
         acc = torch.tensor(
             [[float(row[8]), float(row[9]), float(row[10])] for row in self.rows], device=self.device
         ) * 0.1
+        actions = torch.zeros(self.num_envs, 11, device=self.device)
+        actions = torch.tensor(
+            [[float(row[i]) for i in range(64, 75)] for row in self.rows], device=self.device
+        )
         
-        self.odom_obs_history_wys[:] = torch.cat((project_gravity, ang_vel, q, dq, acc), dim=-1).unsqueeze(1)
+        self.odom_obs_history_wys[:] = torch.cat((project_gravity, ang_vel, q, dq, acc, actions), dim=-1).unsqueeze(1)
         
         yaw = torch.tensor(
             [[float(row[1]) - self.yaw_0[i, 0]] for i, row in enumerate(self.rows)], device=self.device
@@ -140,9 +145,13 @@ class OdomStackingDataEnvFromFile:
         acc = torch.tensor(
             [[float(row[8]), float(row[9]), float(row[10])] for row in self.rows], device=self.device
         ) * 0.1
+        actions = torch.zeros(self.num_envs, 11, device=self.device)
+        actions = torch.tensor(
+            [[float(row[i]) for i in range(64, 75)] for row in self.rows], device=self.device
+        )
         
         self.odom_obs_history_wys = torch.roll(self.odom_obs_history_wys, -1, dims=1)
-        self.odom_obs_history_wys[:, -1] = torch.cat((project_gravity, ang_vel, q, dq, acc), dim=-1)
+        self.odom_obs_history_wys[:, -1] = torch.cat((project_gravity, ang_vel, q, dq, acc, actions), dim=-1)
         
         yaw = torch.tensor(
             [[float(row[1]) - self.yaw_0[i, 0]] for i, row in enumerate(self.rows)], device=self.device
