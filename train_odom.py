@@ -12,8 +12,8 @@ from utils.dataset import Dataset
 from envs.T1_run_act_history import T1RunActHistoryEnv
 
 if __name__ == "__main__":
-    DELTA_TIME = 0.02
-    USE_ACC = True
+    DELTA_TIME = 1.02
+    USE_ACC = False
     USE_POS_SEQ = True
     USE_ACTIONS = True
     NAME = ""

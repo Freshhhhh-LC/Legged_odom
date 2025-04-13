@@ -51,8 +51,10 @@ def umeyama_alignment(X, Y):
     return c, R, t
 
 if __name__ == "__main__":
+    odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-08-00-23-53_0.02s_actions/model_wys_2000.pt"
+    data_dir = "/home/luochangsheng/odom/Legged_odom/data/segment_length=2000"
     DELTA_TIME = 0.02
-    USE_ACC = True
+    USE_ACC = False
     USE_POS_SEQ = True
     USE_ACTIONS = True
     NAME = ""
@@ -73,14 +75,14 @@ if __name__ == "__main__":
     if USE_ACTIONS:
         num_obs_wys += 11
     
-    odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-04-20-35-18_sim_file_0.02s_acc/model_wys_66_sim_file_0.02s_acc.pt"
+    
     # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-02-12-09-59_0.02s_acc_no_pos_seq/model_wys_2000.pt"
     
     name_pred = "pred" + NAME
     name_gt = "gt" + NAME
     
     # data_dir = "/home/luochangsheng/odom/Legged_odom/data_mixed/segment_length=450"
-    data_dir = "/home/luochangsheng/odom/Legged_odom/data/segment_length=1800"
+    
     csv_file_paths = []
     num = 20
     # 随机抽取10个csv文件
@@ -100,6 +102,8 @@ if __name__ == "__main__":
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
     odom_model_wys = torch.jit.load(odom_path).to(env.device)
     odom_model_wys.eval()
+        
+    
     
     # Load the model
 
@@ -189,7 +193,6 @@ if __name__ == "__main__":
         ) # x_i+1
         pred_pos_history = torch.roll(pred_pos_history, -1, dims=1)
         # print("done.shape", done.shape)
-        pred_pos_history[done,:,0:2] = odom_pred_wys_pos[done,0:2].unsqueeze(1)
         pred_pos_history[:, -1, :] = odom_pred_wys_pos
         
         x = pred_pos_history[:, -2, 0]
@@ -224,6 +227,9 @@ if __name__ == "__main__":
 
     for i in range(num_envs):
         scale, R_matrix, translation = umeyama_alignment(pred_pos_np[i], gt_pos_np[i])
+        print(f"Environment {i}: Scale: {scale:.4f}" 
+              f" Rotation: {R_matrix}\n"
+              f" Translation: {translation}")
         aligned_pred_pos[i] = (
             scale * (R_matrix @ pred_pos_np[i].T).T + translation.T
         )
