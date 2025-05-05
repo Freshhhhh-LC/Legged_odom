@@ -52,7 +52,7 @@ def umeyama_alignment(X, Y):
 
 if __name__ == "__main__":
     odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-08-00-23-53_0.02s_actions/model_wys_2000.pt"
-    data_dir = "/home/luochangsheng/odom/Legged_odom/data/segment_length=2000"
+    data_dir = "/home/luochangsheng/odom/Legged_odom/data/15/output"
     DELTA_TIME = 0.02
     USE_ACC = False
     USE_POS_SEQ = True

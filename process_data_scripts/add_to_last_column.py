@@ -17,8 +17,8 @@ def add_to_last_column(input_file, output_file, number_to_add):
         writer.writerows(rows)
 
 if __name__ == "__main__":
-    input_csv = "/home/luochangsheng/odom/Legged_odom/data/14/1744117702143/rl_locomotion_run.csv"  # 输入文件路径
-    output_csv = "/home/luochangsheng/odom/Legged_odom/data/14/1744117702143/rl_locomotion_run_edited.csv"  # 输出文件路径
+    input_csv = "/home/luochangsheng/odom/Legged_odom/data/15/1744534640034/rl_locomotion_run.csv"  # 输入文件路径
+    output_csv = "/home/luochangsheng/odom/Legged_odom/data/15/1744534640034/rl_locomotion_run_edited.csv"  # 输出文件路径
 
     # 获取输入文件的父文件夹名称并计算要加的数
     parent_folder_name = os.path.basename(os.path.dirname(input_csv))
