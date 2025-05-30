@@ -1,17 +1,24 @@
-import csv
+import os
+import shutil
 
-def extract_and_save_tum_format(input_csv, output_txt):
-    with open(input_csv, 'r') as csv_file, open(output_txt, 'w') as txt_file:
-        csv_reader = csv.DictReader(csv_file)
-        for row in csv_reader:
-            timestamp = row['time']
-            x = row['robot_x']
-            y = row['robot_y']
-            txt_file.write(f"{timestamp} {x} {y} 0 0 0 0 1\n")  # TUM 格式
+model_moves = [
+    ("/home/luochangsheng/odom/Legged_odom/logs/2025-04-08-00-23-53_0.02s_actions/model_wys_2000.pt", "sim_no_acc.pt"),
+    ("/home/luochangsheng/odom/logs/2025-05-26-19-24-02_file_0.02s_acc_actions/model_wys_81_file_0.02s_acc_actions.pt", "real_with_acc.pt"),
+    ("/home/luochangsheng/odom/logs/2025-05-24-20-46-03_file_0.02s_actions/model_wys_1_file_0.02s_actions.pt", "real_no_acc.pt"),
+    ("/home/luochangsheng/odom/logs/2025-05-23-19-12-51_file_0.02s_actions/model_wys_0_file_0.02s_actions.pt", "sim_no_acc_enhanced_by_no_acc_real.pt"),
+    ("/home/luochangsheng/odom/logs/2025-05-23-21-00-55_file_0.02s_acc_actions/model_wys_0_file_0.02s_acc_actions.pt", "sim_with_acc_enhanced_id0.pt"),
+    ("/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-02-29_file_0.02s_actions/model_wys_4_file_0.02s_actions.pt", "mixed_no_acc_1to1.pt"),
+    ("/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-02-19_file_0.02s_acc_actions/model_wys_6_file_0.02s_acc_actions.pt", "mixed_with_acc_1to1.pt"),
+    ("/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-14-56_file_0.02s_actions/model_wys_4_file_0.02s_actions.pt", "mixed_no_acc_10to1.pt"),
+    ("/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-15-04_file_0.02s_acc_actions/model_wys_32_file_0.02s_acc_actions.pt", "mixed_with_acc_10to1.pt"),
+    ("/home/luochangsheng/odom/logs/2025-05-24-21-42-50_file_0.02s_acc_actions/model_wys_2_file_0.02s_acc_actions.pt", "sim_with_acc_enhanced_pre3.pt"),
+    ("/home/luochangsheng/odom/Legged_odom/logs/2025-05-24-19-52-41_0.02s_actions/model_wys_2000.pt", "ordinary_pre3.pt"),
+]
 
-# 输入文件路径和输出文件路径
-input_csv_path = "/home/luochangsheng/odom/Legged_odom/data/segment_length=1800/segment_20.csv"
-output_txt_path = "/home/luochangsheng/odom/Legged_odom/gt.txt"
+target_dir = "/home/luochangsheng/odom/Legged_odom/collected_models"
+os.makedirs(target_dir, exist_ok=True)
 
-# 调用函数
-extract_and_save_tum_format(input_csv_path, output_txt_path)
+for src_path, new_name in model_moves:
+    dst_path = os.path.join(target_dir, new_name)
+    print(f"移动 {src_path} -> {dst_path}")
+    shutil.copy2(src_path, dst_path)

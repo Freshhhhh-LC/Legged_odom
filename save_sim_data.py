@@ -16,10 +16,10 @@ from isaacgym.torch_utils import *
 
 if __name__ == "__main__":
     data_dir = os.path.join("data_sim", "segments")
-    data_length = 3600
-    num_envs = 4096
+    data_length = 48000
+    num_envs = 256
     os.makedirs(data_dir, exist_ok=True)  # 创建 data 文件夹
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, num_envs, "cuda:0", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, num_envs, "cuda:3", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
     odom_model_wys = OdomEstimator_wys(35 + 4, env.obs_stacking).to(env.device)
@@ -54,6 +54,7 @@ if __name__ == "__main__":
             act_std = dist.scale
             act = act_mean + act_std * torch.randn_like(act_std)
         obs, rew, done, infos = env.step(act)
+        print("obs shape:", obs.shape)
         obs_history = infos["obs_history"].to(env.device)
         times = torch.zeros(env.num_envs, device=env.device).cpu().numpy()
         _, _, yaw = get_euler_xyz(env.root_states[:, 3:7])
@@ -79,6 +80,7 @@ if __name__ == "__main__":
             # 为每个环境生成单独的文件路径
             env_file_path = os.path.join(data_dir, f"segment_{k}.csv")
             # 如果文件不存在，写入表头
+            
             if not os.path.exists(env_file_path):
                 with open(env_file_path, mode='w', newline='') as csv_file:
                     csv_writer = csv.writer(csv_file)
@@ -89,10 +91,9 @@ if __name__ == "__main__":
                         "q_13", "q_14", "q_15", "q_16", "q_17", "q_18", "q_19", "q_20", "q_21", "q_22",
                         "dq_0", "dq_1", "dq_2", "dq_3", "dq_4", "dq_5", "dq_6", "dq_7", "dq_8", "dq_9", "dq_10", "dq_11",
                         "dq_12", "dq_13", "dq_14", "dq_15", "dq_16", "dq_17", "dq_18", "dq_19", "dq_20", "dq_21", "dq_22",
-                        "mocap_time", "mocap_timestamp", "robot_x", "robot_y", "robot_yaw", "ball_x", "ball_y",
-                        "actions_0", "actions_1", "actions_2", "actions_3", "actions_4", "actions_5",
-                        "actions_6", "actions_7", "actions_8", "actions_9", "actions_10"
-                    ])
+                        "mocap_time", "mocap_timestamp", "robot_x", "robot_y", "robot_yaw", "ball_x", "ball_y"
+                    ] + [f"obs_{i}" for i in range(83)]
+                    )
 
             # 写入数据到对应环境的文件
             with open(env_file_path, mode='a', newline='') as csv_file:
@@ -114,8 +115,21 @@ if __name__ == "__main__":
                     mocap_time[k].item(), mocap_timestamp[k].item(),
                     robot_pos[k, 0].item(), robot_pos[k, 1].item(), yaw[k].item(),
                     ball_pos[k, 0].item(), ball_pos[k, 1].item(),
-                    actions[k, 0].item(), actions[k, 1].item(), actions[k, 2].item(),
-                    actions[k, 3].item(), actions[k, 4].item(), actions[k, 5].item(),
-                    actions[k, 6].item(), actions[k, 7].item(), actions[k, 8].item(),
-                    actions[k, 9].item(), actions[k, 10].item()
+                    obs[k, 0].item(), obs[k, 1].item(), obs[k, 2].item(), obs[k, 3].item(), obs[k, 4].item(),
+                    obs[k, 5].item(), obs[k, 6].item(), obs[k, 7].item(), obs[k, 8].item(), obs[k, 9].item(),
+                    obs[k, 10].item(), obs[k, 11].item(), obs[k, 12].item(), obs[k, 13].item(), obs[k, 14].item(),
+                    obs[k, 15].item(), obs[k, 16].item(), obs[k, 17].item(), obs[k, 18].item(), obs[k, 19].item(),
+                    obs[k, 20].item(), obs[k, 21].item(), obs[k, 22].item(), obs[k, 23].item(), obs[k, 24].item(),
+                    obs[k, 25].item(), obs[k, 26].item(), obs[k, 27].item(), obs[k, 28].item(), obs[k, 29].item(),
+                    obs[k, 30].item(), obs[k, 31].item(), obs[k, 32].item(), obs[k, 33].item(), obs[k, 34].item(),
+                    obs[k, 35].item(), obs[k, 36].item(), obs[k, 37].item(), obs[k, 38].item(), obs[k, 39].item(),
+                    obs[k, 40].item(), obs[k, 41].item(), obs[k, 42].item(), obs[k, 43].item(), obs[k, 44].item(),
+                    obs[k, 45].item(), obs[k, 46].item(), obs[k, 47].item(), obs[k, 48].item(), obs[k, 49].item(),
+                    obs[k, 50].item(), obs[k, 51].item(), obs[k, 52].item(), obs[k, 53].item(), obs[k, 54].item(),
+                    obs[k, 55].item(), obs[k, 56].item(), obs[k, 57].item(), obs[k, 58].item(), obs[k, 59].item(),
+                    obs[k, 60].item(), obs[k, 61].item(), obs[k, 62].item(), obs[k, 63].item(), obs[k, 64].item(),
+                    obs[k, 65].item(), obs[k, 66].item(), obs[k, 67].item(), obs[k, 68].item(), obs[k, 69].item(),
+                    obs[k, 70].item(), obs[k, 71].item(), obs[k, 72].item(), obs[k, 73].item(), obs[k, 74].item(),
+                    obs[k, 75].item(), obs[k, 76].item(), obs[k, 77].item(), obs[k, 78].item(), obs[k, 79].item(),
+                    obs[k, 80].item(), obs[k, 81].item(), obs[k, 82].item(),
                 ])

@@ -6,7 +6,7 @@ def divide_csv(file_path, segment_length=450):
     # base_dir = os.path.dirname(file_path)
     # parent_dir = os.path.dirname(base_dir)
     # parent_dir = os.path.dirname(parent_dir)
-    parent_dir = "/home/luochangsheng/odom/Legged_odom/data_mixed"
+    parent_dir = "/home/luochangsheng/odom/Legged_odom/data"
     segments_dir = os.path.join(parent_dir, f"segment_length={segment_length}")
     os.makedirs(segments_dir, exist_ok=True)
 
@@ -34,12 +34,16 @@ def divide_csv(file_path, segment_length=450):
 if __name__ == "__main__":
     # BASE_DIR = "/home/luochangsheng/odom/Legged_odom/data"
     # DATA_INDEX = ["9", "10", "11", "12"]
-    BASE_DIR = "/home/luochangsheng/odom/Legged_odom/data"
-    DATA_INDEX = ["14"]
-    for index in DATA_INDEX:
-        dir = os.path.join(BASE_DIR, index, "segments")
-        for data_file in os.listdir(dir):
-            if data_file.endswith(".csv"):
-                data_file_path = os.path.join(dir, data_file)
-                print(f"Processing file: {data_file_path}")
-                divide_csv(data_file_path, segment_length=2000)
+    # BASE_DIR = "/home/luochangsheng/odom/Legged_odom/data"
+    # DATA_INDEX = ["14"]
+    # for index in DATA_INDEX:
+    #     dir = os.path.join(BASE_DIR, index, "segments")
+    #     for data_file in os.listdir(dir):
+    #         if data_file.endswith(".csv"):
+    #             data_file_path = os.path.join(dir, data_file)
+    #             print(f"Processing file: {data_file_path}")
+    #             divide_csv(data_file_path, segment_length=2000)
+    
+    file = "/home/luochangsheng/odom/Legged_odom/data/16/merged_output.csv"
+    
+    divide_csv(file, segment_length=2000)

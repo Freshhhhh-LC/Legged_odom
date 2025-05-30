@@ -5,15 +5,16 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.wrapper_file import OdomStackingDataEnvFromFile
-from utils.model import OdomEstimator_wys, OdomEstimator_wys_LSTM
+from utils.model import OdomEstimator_wys_CNN
 from utils.dataset import Dataset
 
 if __name__ == "__main__":
     DELTA_TIME = 0.02
     USE_ACC = False
+    # USE_ACC = True
     USE_POS_SEQ = True
     USE_ACTIONS = True
-    NAME = "_file"
+    NAME = "_file_CNN"
     if DELTA_TIME == 0.02:
         NAME += "_0.02s"
     else:
@@ -44,18 +45,20 @@ if __name__ == "__main__":
     csv_file_paths.sort()
     num_envs = len(csv_file_paths)
     
-    env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:0")
+    env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:1")
     num_steps = env.num_rows[0]
     
-    odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
+    # odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
+    # optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
+    odom_model_wys = OdomEstimator_wys_CNN(num_obs_wys, env.obs_stacking).to(env.device)
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
-    
-    # laatest_model = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-08-00-23-53_0.02s_actions/model_wys_2000.pt" # before padding
+
+    # laatest_model = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-27-00-03-03_LSTM_0.02s_actions/model_wys_2000.pt" # before padding
     # odom_model_wys = torch.jit.load(laatest_model).to(env.device)
     # optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=1e-5)
     # odom_model_wys.train()
     
-    # latest_model = "/home/luochangsheng/odom/Enhanced_odom/models/best_odom_model_padded.pth"
+    # latest_model = "/home/luochangsheng/odom/Legged_odom/models/best_LSTM_odom_model_padded.pth"
     # odom_model_wys.load_state_dict(torch.load(latest_model, map_location=env.device))
     # odom_model_wys.train()
     # optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=1e-5)
@@ -70,9 +73,8 @@ if __name__ == "__main__":
     buf.AddBuffer("pred_pos_history", (env.obs_stacking + 3, 2), device=env.device)
     buf.AddBuffer("abs_yaw_history", (env.obs_stacking + 2,), device=env.device)
 
-    for epoch in range(100):
-        env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:0")
-        num_steps = env.num_rows[0]
+    for epoch in range(10):
+        env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:1")
         infos = env.reset()
         if USE_ACC and USE_ACTIONS:
             odom_obs_history_wys = infos["odom_obs_history_wys"].to(env.device)
@@ -123,8 +125,12 @@ if __name__ == "__main__":
                 )[:, 3:] # x_i - x_{i-1}
                 yaw_input = abs_yaw_history[:, :] - abs_yaw_history[:, 1].unsqueeze(1)
                 yaw_input = yaw_input[:, 2:]
-                with torch.no_grad(): # 本次预测不需要梯度
-                    odom_pred_wys = odom_model_wys(odom_obs_history_wys[:, 1:], yaw_input, pos_input)
+                with torch.no_grad():
+                    odom_pred_wys = odom_model_wys(
+                        odom_obs_history_wys[:, 1:],  # [envs, stack, obs]
+                        yaw_input,                    # [envs, stack]
+                        pos_input                     # [envs, stack, 2]
+                    )
                 if DELTA_TIME == 0.02:
                     index = -1
                 else:
@@ -137,15 +143,14 @@ if __name__ == "__main__":
                 dim=-1
                 ) # x_i+1
                 pred_pos_history = torch.roll(pred_pos_history, -1, dims=1)
-                # print("done.shape", done.shape)
                 pred_pos_history[done,:,0:2] = odom_pred_wys_pos[done,0:2].unsqueeze(1)
                 pred_pos_history[:, -1, :] = odom_pred_wys_pos
-                
+
             use_pred_pos = True
             odom_loss_list_wys = list()
             for j in range(20):
                 if use_pred_pos==False:
-                    odom_pred_wys = odom_model_wys(buf["odom_obs_history_wys"], buf["yaw_history"][:, :, 2:], buf["pos_history"][..., :-1, :])
+                    pass
                 else:
                     pos_input = torch.stack(
                         (
@@ -156,7 +161,11 @@ if __name__ == "__main__":
                     )[:, :, 1:-2]
                     yaw_input = buf["abs_yaw_history"][:, :, :] - buf["abs_yaw_history"][:, :, 0].unsqueeze(-1)
                     yaw_input = yaw_input[:, :, 1:-1]
-                    odom_pred_wys = odom_model_wys(buf["odom_obs_history_wys"][:, :, :-1], yaw_input, pos_input)
+                    odom_pred_wys = odom_model_wys(
+                        buf["odom_obs_history_wys"][:, :, :-1], 
+                        yaw_input, 
+                        pos_input
+                    )
                 if DELTA_TIME == 0.02:
                     index = -2
                 else:
@@ -170,7 +179,7 @@ if __name__ == "__main__":
             odom_loss_mean_wys = sum(odom_loss_list_wys) / len(odom_loss_list_wys)
             recorder.add_scalar("odom_loss_wys", odom_loss_mean_wys, i)
             loss_list.append(odom_loss_mean_wys) 
-            print(f"epoch: {epoch}, iter: {i + 1}, \todom_loss_wys: {odom_loss_mean_wys}")
+            print(f"epoch: {epoch}, iter: {i + 1}, \todom_loss_wys: {odom_loss_mean_wys}") 
             if i % 50 == 0:
                 odom_model_wys.eval()
                 odom_model_wys.cpu()

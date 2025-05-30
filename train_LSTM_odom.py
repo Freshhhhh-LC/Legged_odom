@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.wrapper import ObsStackingEnvWrapperForOdom
-from utils.model import DenoisingRMA, OdomEstimator_wys, OdomEstimator_Legolas, OdomEstimator_baseline
+from utils.model import DenoisingRMA, OdomEstimator_wys_LSTM, OdomEstimator_Legolas, OdomEstimator_baseline
 from utils.dataset import Dataset
 from envs.T1_run_act_history import T1RunActHistoryEnv
 
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     USE_ACC = False
     USE_POS_SEQ = True
     USE_ACTIONS = True
-    NAME = ""
+    NAME = "_LSTM"
     if DELTA_TIME == 0.02:
         NAME += "_0.02s"
     else:
@@ -36,18 +36,12 @@ if __name__ == "__main__":
     
     dir = os.path.join("logs", time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + NAME)
     os.makedirs(dir, exist_ok=True)
-    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 256, "cuda:3", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
+    env = ObsStackingEnvWrapperForOdom(T1RunActHistoryEnv, 50, 256, "cuda:1", True, curriculum=False, change_cmd=True) # T1RunActHistoryEnv, 50, 4096, "cuda:0", True, curriculum=False, change_cmd=True
     model = DenoisingRMA(env.num_act, env.num_obs, env.obs_stacking, env.num_privileged_obs, 64).to(env.device)
 
     
-    odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
+    odom_model_wys = OdomEstimator_wys_LSTM(num_obs_wys, env.obs_stacking).to(env.device)
     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
-
-    odom_model_Legolas = OdomEstimator_Legolas(46 + 2, env.obs_stacking).to(env.device)
-    optimizer_Legolas = torch.optim.Adam(odom_model_Legolas.parameters(), lr=3e-4)
-
-    odom_model_baseline = OdomEstimator_baseline(45 + 3, env.obs_stacking).to(env.device)
-    optimizer_baseline = torch.optim.Adam(odom_model_baseline.parameters(), lr=3e-4)
 
     state_dict = torch.load("models/T1_run.pth", weights_only=True)
     model.load_state_dict(state_dict["model"])
@@ -78,6 +72,13 @@ if __name__ == "__main__":
     #     odom_model_Legolas.load_state_dict(checkpoint['model'])
     #     optimizer_Legolas.load_state_dict(checkpoint['optimizer'])
     #     print(f"Loaded model from {latest_Legolas_model_path}")
+    
+    # latest_LSTM_model_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-27-00-03-03_LSTM_0.02s_actions/model_wys_2000.pt"
+    # if latest_LSTM_model_path:
+    #     odom_model_wys = torch.jit.load(latest_LSTM_model_path).to(env.device)
+    #     odom_model_wys.train()
+    #     optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
+    #     print(f"Loaded model from {latest_LSTM_model_path}")
 
     obs, infos = env.reset()
     obs_history = infos["obs_history"].to(env.device)
@@ -150,7 +151,11 @@ if __name__ == "__main__":
             with torch.no_grad(): # 本次预测不需要梯度
                 if not USE_POS_SEQ:
                     pos_input = torch.zeros_like(pos_input)
-                odom_pred_wys = odom_model_wys(odom_obs_history_wys[:, 1:], yaw_input, pos_input)
+                odom_pred_wys = odom_model_wys(
+                    odom_obs_history_wys[:, 1:],  # [envs, stack, obs]
+                    yaw_input,                    # [envs, stack]
+                    pos_input                     # [envs, stack, 2]
+                )
             if DELTA_TIME == 0.02:
                 index = -1
             else:
@@ -184,7 +189,11 @@ if __name__ == "__main__":
                 yaw_input = yaw_input[:, :, 1:-1]
                 if not USE_POS_SEQ:
                     pos_input = torch.zeros_like(pos_input)
-                odom_pred_wys = odom_model_wys(buf["odom_obs_history_wys"][:, :, :-1], yaw_input, pos_input)
+                odom_pred_wys = odom_model_wys(
+                    buf["odom_obs_history_wys"][:, :, :-1], 
+                    yaw_input, 
+                    pos_input
+                )
             if DELTA_TIME == 0.02:
                 index = -2
             else:
@@ -208,41 +217,3 @@ if __name__ == "__main__":
             scripted_model.save(os.path.join(dir, f"model_wys_{i + 1}.pt"))
             odom_model_wys.to(env.device)
             odom_model_wys.train()
-        
-        # odom_loss_list_Legolas = list()
-        # for j in range(20):
-        #     odom_pred_Legolas = odom_model_Legolas(buf["odom_obs_history_Legolas"], buf["yaw_history"][:, :, 2:])
-        #     pos_inc = buf["pos_history"][..., -1, :] - buf["pos_history"][..., -2 , :]
-        #     odom_loss_Legolas = F.mse_loss(odom_pred_Legolas, pos_inc)
-        #     optimizer_Legolas.zero_grad()
-        #     odom_loss_Legolas.backward()
-        #     optimizer_Legolas.step()
-        #     odom_loss_list_Legolas.append(odom_loss_Legolas.item())
-        # odom_loss_mean_Legolas = sum(odom_loss_list_Legolas) / len(odom_loss_list_Legolas)
-        # recorder.add_scalar("odom_loss_Legolas", odom_loss_mean_Legolas, i)
-
-        # if i % 10 == 9:
-        #     print(f"iter: {i + 1}, \todom_loss_Legolas: {odom_loss_mean_Legolas}")
-        # if i % 100 == 99:
-        #     # 保存为 TorchScript 格式
-        #     scripted_model = torch.jit.script(odom_model_Legolas)
-        #     scripted_model.save(os.path.join(dir, f"model_Legolas_{i + 1}.pt"))
-        
-        # odom_loss_list_baseline = list()
-        # for j in range(20):
-        #     odom_pred_baseline = odom_model_baseline(buf["odom_obs_history_baseline"], buf["yaw_history"][:, :, 2:], buf["start_mask"])
-
-        #     odom_loss_baseline = F.mse_loss(odom_pred_baseline, buf["odom"])
-        #     optimizer_baseline.zero_grad()
-        #     odom_loss_baseline.backward()
-        #     optimizer_baseline.step()
-        #     odom_loss_list_baseline.append(odom_loss_baseline.item())
-        # odom_loss_mean_baseline = sum(odom_loss_list_baseline) / len(odom_loss_list_baseline)
-        # recorder.add_scalar("odom_loss_baseline", odom_loss_mean_baseline, i)
-
-        # if i % 10 == 9:
-        #     print(f"iter: {i + 1}, \todom_loss_baseline: {odom_loss_mean_baseline}")
-        # if i % 100 == 99:
-        #     # 保存为 TorchScript 格式
-        #     scripted_model = torch.jit.script(odom_model_baseline)
-        #     scripted_model.save(os.path.join(dir, f"model_baseline_{i + 1}.pt"))

@@ -112,7 +112,7 @@ class T1RunActHistoryEnv(BasicEnv):
         self.need_change_cmd = change_cmd
         self.num_zero_vel_envs = int(self.num_envs * 0.25)
         if self.need_change_cmd:
-            self.ep_len_max = 15000 # 30s
+            self.ep_len_max = 1000 # 20s
         else:
             self.ep_len_max = 5000  # 100 s
 

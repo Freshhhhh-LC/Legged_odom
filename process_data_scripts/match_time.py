@@ -1,4 +1,4 @@
-for i in range(15, 16):
+for i in range(16, 17):
     import os
     import csv
     import numpy as np
@@ -7,12 +7,12 @@ for i in range(15, 16):
     TIME_THRESHOLD = 0.05
     TIME_OF_SEGMENT = 4.5
 
-    dir = os.path.join("data", DATA_NAME)
+    dir = os.path.join("Legged_odom", "data", DATA_NAME)
     os.makedirs(dir, exist_ok=True) # 如果目录不存在则创建目录
     # time,timestamp,robot_x,robot_y,robot_yaw,ball_x,ball_y
-    mocap_file = open(os.path.join("data", DATA_NAME, "mocap.csv"), mode="r", newline="", encoding="utf-8")
+    mocap_file = open(os.path.join(dir, "mocap.csv"), mode="r", newline="", encoding="utf-8")
     # time(1),yaw(1),projected_gravity(3),ang_vel(3),lin_acc(3),q(23),dq(23)
-    booster_file = open(os.path.join("data", DATA_NAME, "booster.csv"), mode="r", newline="", encoding="utf-8")
+    booster_file = open(os.path.join(dir, "booster.csv"), mode="r", newline="", encoding="utf-8")
     mocap_reader = csv.reader(mocap_file)
     booster_reader = csv.reader(booster_file)
 

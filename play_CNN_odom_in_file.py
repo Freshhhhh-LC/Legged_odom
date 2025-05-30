@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 
 from utils.wrapper_file import OdomStackingDataEnvFromFile
-from utils.model import DenoisingRMA, OdomEstimator_wys
+from utils.model import DenoisingRMA, OdomEstimator_wys_CNN
 from utils.dataset import Dataset
 
 def umeyama_alignment(X, Y):
@@ -51,19 +51,7 @@ def umeyama_alignment(X, Y):
     return c, R, t
 
 if __name__ == "__main__":
-    # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-04-08-00-23-53_0.02s_actions/model_wys_2000.pt" # sim data without acc
-    odom_path = "/home/luochangsheng/odom/logs/2025-05-26-19-24-02_file_0.02s_acc_actions/model_wys_81_file_0.02s_acc_actions.pt" # real data with acc
-    # odom_path = "/home/luochangsheng/odom/logs/2025-05-24-20-46-03_file_0.02s_actions/model_wys_1_file_0.02s_actions.pt" # real data without acc
-    # odom_path = "/home/luochangsheng/odom/logs/2025-05-23-19-12-51_file_0.02s_actions/model_wys_0_file_0.02s_actions.pt" # sim data without acc,and enhanced by real data with out acc
-    odom_path = "/home/luochangsheng/odom/logs/2025-05-23-21-00-55_file_0.02s_acc_actions/model_wys_0_file_0.02s_acc_actions.pt" # sim data without acc,and enhanced by real data with acc
-    # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-02-29_file_0.02s_actions/model_wys_4_file_0.02s_actions.pt" # mixed data without acc 1:1
-    # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-02-19_file_0.02s_acc_actions/model_wys_6_file_0.02s_acc_actions.pt" # mixed data with acc 1:1
-    # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-14-56_file_0.02s_actions/model_wys_4_file_0.02s_actions.pt" # mixed data without acc 10:1
-    # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-23-22-15-04_file_0.02s_acc_actions/model_wys_32_file_0.02s_acc_actions.pt" # mixed data with acc 10:1
-    # odom_path = "/home/luochangsheng/odom/logs/2025-05-24-21-42-50_file_0.02s_acc_actions/model_wys_2_file_0.02s_acc_actions.pt" # sim data without acc,and enhanced by real data with acc, 提前三帧
-    # odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-24-19-52-41_0.02s_actions/model_wys_2000.pt" # ordinary, 提前三帧
-    # odom_path = "/home/luochangsheng/odom/logs/2025-05-27-15-36-50_file_0.02s_actions/model_wys_0_350.pt" # ordinary
-    odom_path = "/home/luochangsheng/odom/logs/2025-05-30-13-52-55_file_0.02s_actions/model_wys_1_file_0.02s_actions0.pt"
+    odom_path = "/home/luochangsheng/odom/Legged_odom/logs/2025-05-30-20-07-47_CNN_0.02s_actions/model_wys_2000.pt" # real data with acc, CNN
     
     data_dir = "/home/luochangsheng/odom/Enhanced_odom/data/test"
     DELTA_TIME = 0.02
@@ -112,8 +100,9 @@ if __name__ == "__main__":
     env = OdomStackingDataEnvFromFile(csv_file_paths, obs_stacking=50, device="cuda:3")
     num_steps = env.num_rows[0]
     
-    odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
-    optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
+    # odom_model_wys = OdomEstimator_wys(num_obs_wys + 4, env.obs_stacking).to(env.device)
+    # optimizer_wys = torch.optim.Adam(odom_model_wys.parameters(), lr=3e-4)
+    odom_model_wys = OdomEstimator_wys_CNN(num_obs_wys, env.obs_stacking).to(env.device)
     odom_model_wys = torch.jit.load(odom_path).to(env.device)
     odom_model_wys.eval()
         
@@ -195,7 +184,11 @@ if __name__ == "__main__":
         with torch.no_grad(): # 本次预测不需要梯度
             if not USE_POS_SEQ:
                 pos_input = torch.zeros_like(pos_input)
-            odom_pred_wys = odom_model_wys(odom_obs_history_wys[:, 1:], yaw_input, pos_input)
+            odom_pred_wys = odom_model_wys(
+                odom_obs_history_wys[:, 1:],  # [envs, stack, obs]
+                yaw_input,                    # [envs, stack]
+                pos_input                     # [envs, stack, 2]
+            )
         if DELTA_TIME == 0.02:
             index = -1
         else:

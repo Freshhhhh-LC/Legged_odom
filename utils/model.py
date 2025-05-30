@@ -141,7 +141,13 @@ class OdomEstimator_wys(torch.nn.Module):
     def forward(self, stacked_obs, stacked_yaw, stacked_pos):
         input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1), stacked_pos), dim=-1).flatten(
             start_dim=-2
-        )
+        ) # 24,1024,50,48
+        # # 打印模型输入里那些为0的数的索引
+        # zero_indices = torch.nonzero(input == 1)
+        # if zero_indices[0].numel() > 0:
+        #     print("模型输入中有1的数，索引为：", zero_indices[:, 1].tolist())
+        # else:
+        #     print("模型输入中没有1的数")
         return self.net(input)
     
 class OdomEstimator_Legolas(torch.nn.Module):
@@ -184,94 +190,92 @@ class OdomEstimator_baseline(torch.nn.Module):
         ).flatten(start_dim=-2)
         return self.net(input)
 
-    
-# class Bottlrneck(torch.nn.Module):
-#     def __init__(self,In_channel,Med_channel,Out_channel,downsample=False):
-#         super(Bottlrneck, self).__init__()
-#         self.stride = 1
-#         if downsample == True:
-#             self.stride = 2
 
-#         self.layer = torch.nn.Sequential(
-#             torch.nn.Conv1d(In_channel, Med_channel, 1, self.stride),
-#             torch.nn.BatchNorm1d(Med_channel),
-#             torch.nn.ReLU(),
-#             torch.nn.Conv1d(Med_channel, Med_channel, 3, padding=1),
-#             torch.nn.BatchNorm1d(Med_channel),
-#             torch.nn.ReLU(),
-#             torch.nn.Conv1d(Med_channel, Out_channel, 1),
-#             torch.nn.BatchNorm1d(Out_channel),
-#             torch.nn.ReLU(),
-#         )
+class OdomEstimator_wys_LSTM(torch.nn.Module):
+    def __init__(self, num_obs, num_stack, hidden_size=128, num_layers=2, dropout=0.5):
+        super().__init__()
+        input_size = num_obs + 2 + 2
+        self.lstm = torch.nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0.0  # LSTM的dropout只在num_layers>1时生效
+        )
+        self.dropout = torch.nn.Dropout(dropout)
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(hidden_size, 64),
+            torch.nn.ELU(),
+            torch.nn.Linear(64, 2)
+        )
 
-#         if In_channel != Out_channel:
-#             self.res_layer = torch.nn.Conv1d(In_channel, Out_channel,1,self.stride)
-#         else:
-#             self.res_layer = None
+    def forward(self, stacked_obs, stacked_yaw, stacked_pos):
+        # 支持 [B, T, D] 或 [B, N, T, D], 即[batch_size, num_envs, time_steps, feature_dim] 或 [batch_size, time_steps, feature_dim]
+        cos_yaw = torch.cos(stacked_yaw).unsqueeze(-1)
+        sin_yaw = torch.sin(stacked_yaw).unsqueeze(-1)
+        x = torch.cat((stacked_obs, cos_yaw, sin_yaw, stacked_pos), dim=-1)
+        if x.dim() == 4:
+            B, N, T, D = x.shape
+            x = x.view(B * N, T, D)
+            lstm_out, _ = self.lstm(x)
+            lstm_out = self.dropout(lstm_out)
+            out = self.fc(lstm_out[:, -1, :])
+            out = out.view(B, N, 2)
+        elif x.dim() == 3:
+            B, T, D = x.shape
+            lstm_out, _ = self.lstm(x)
+            lstm_out = self.dropout(lstm_out)
+            out = self.fc(lstm_out[:, -1, :])
+            out = out.view(B, 2)
+        else:
+            raise ValueError(f"Unexpected input shape: {x.shape}")
+        return out
 
-#     def forward(self,x):
-#         if self.res_layer is not None:
-#             residual = self.res_layer(x)
-#         else:
-#             residual = x
-#         return self.layer(x)+residual
-    
-# class OdomEstimator_Legolas(torch.nn.Module):
+class OdomEstimator_wys_CNN(torch.nn.Module):
+    def __init__(self, num_obs, num_stack):
+        super().__init__()
+        # 输入: [batch, num_stack, num_obs+2+2]
+        input_channels = num_obs + 2 + 2  # obs + cos(yaw) + sin(yaw) + pos(x2)
+        self.num_stack = num_stack
+        self.conv = torch.nn.Sequential(
+            torch.nn.Conv1d(input_channels, 128, kernel_size=3, padding=1),
+            torch.nn.ELU(),
+            torch.nn.Conv1d(128, 64, kernel_size=3, padding=1),
+            torch.nn.ELU(),
+        )
+        self.dropout = torch.nn.Dropout(p=0.3)
+        self.fc = torch.nn.Sequential(
+            torch.nn.Linear(64 * num_stack, 128),
+            torch.nn.ELU(),
+            torch.nn.Linear(128, 2)
+        )
 
-#     def __init__(self, num_obs, num_stack):
-#         super().__init__()
-#         # self.net = torch.nn.Sequential(
-#         #     torch.nn.Linear(num_obs * num_stack, 512),
-#         #     torch.nn.ELU(),
-#         #     torch.nn.Linear(512, 128),
-#         #     torch.nn.ELU(),
-#         #     torch.nn.Linear(128, 64),
-#         #     torch.nn.ELU(),
-#         #     torch.nn.Linear(64, 2),
-#         # )
-#         self.features = torch.nn.Sequential(
-#             torch.nn.Conv1d(num_obs,64,kernel_size=7,stride=2,padding=3),
-#             torch.nn.MaxPool1d(3,2,1),
-
-#             Bottlrneck(64,64,256,True),
-#             Bottlrneck(256,64,256,False),
-#             Bottlrneck(256,64,256,False),
-
-#             torch.nn.AdaptiveAvgPool1d(1)
-#         )
-#         self.classifer = torch.nn.Sequential(
-#             torch.nn.Linear(256,2)
-#         )
-
-
-#     def forward(self, stacked_obs, stacked_yaw):
-#         batch_size = stacked_obs.size(0)
-#         num_envs = stacked_obs.size(1)
-#         input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1)), dim=-1) #24,1024,50,48
-#         # input = input.flatten(start_dim=-2)
-#         input = input.view(input.size(0) * input.size(1), -1, input.size(3)).transpose(1,2) #24*1024,50,48
-#         input = self.features(input)
-#         input = input.view(input.size(0), -1)
-#         return self.classifer(input).view(batch_size,num_envs,2)
-
-
-# class OdomEstimator_Legolas(torch.nn.Module):
-
-#     def __init__(self, num_obs, num_stack):
-#         super().__init__()
-#         self.net = torch.nn.Sequential(
-#             torch.nn.Conv1d(in_channels=num_obs, out_channels=64, kernel_size=3, stride=1, padding=1),
-#             torch.nn.ELU(),
-#             torch.nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1),
-#             torch.nn.ELU(),
-#             torch.nn.AdaptiveAvgPool1d(1),
-#             torch.nn.Flatten(),
-#             torch.nn.Linear(128, 2)
-#         )
-
-#     def forward(self, stacked_obs, stacked_yaw):
-#         input = torch.cat((stacked_obs, torch.cos(stacked_yaw).unsqueeze(-1), torch.sin(stacked_yaw).unsqueeze(-1)), dim=-1) #24,1024,50,48
-#         # input = input.flatten(start_dim=-2)
-#         input = input.view(input.size(0) * input.size(1), -1, input.size(3)).transpose(1,2) #24*1024,50,48
-
-#         return self.net(input)
+    def forward(self, stacked_obs, stacked_yaw, stacked_pos):
+        # stacked_obs: [B, num_stack, num_obs] or [B, N, num_stack, num_obs]
+        # stacked_yaw: [B, num_stack] or [B, N, num_stack]
+        # stacked_pos: [B, num_stack, 2] or [B, N, num_stack, 2]
+        if stacked_obs.dim() == 4:
+            B, N, T, D = stacked_obs.shape
+            cos_yaw = torch.cos(stacked_yaw).unsqueeze(-1)  # [B, N, T, 1]
+            sin_yaw = torch.sin(stacked_yaw).unsqueeze(-1)  # [B, N, T, 1]
+            x = torch.cat((stacked_obs, cos_yaw, sin_yaw, stacked_pos), dim=-1)  # [B, N, T, D+2+2]
+            x = x.view(B * N, T, -1)  # [B*N, T, C]
+            x = x.transpose(1, 2)     # [B*N, C, T]
+            x = self.conv(x)          # [B*N, 64, T]
+            x = x.flatten(start_dim=1)  # [B*N, 64*T]
+            x = self.dropout(x)
+            out = self.fc(x)            # [B*N, 2]
+            out = out.view(B, N, 2)
+        elif stacked_obs.dim() == 3:
+            B, T, D = stacked_obs.shape
+            cos_yaw = torch.cos(stacked_yaw).unsqueeze(-1)  # [B, T, 1]
+            sin_yaw = torch.sin(stacked_yaw).unsqueeze(-1)  # [B, T, 1]
+            x = torch.cat((stacked_obs, cos_yaw, sin_yaw, stacked_pos), dim=-1)  # [B, T, D+2+2]
+            x = x.transpose(1, 2)     # [B, C, T]
+            x = self.conv(x)          # [B, 64, T]
+            x = x.flatten(start_dim=1)  # [B, 64*T]
+            x = self.dropout(x)
+            out = self.fc(x)            # [B, 2]
+        else:
+            raise ValueError(f"Unexpected input shape: {stacked_obs.shape}")
+        return out
